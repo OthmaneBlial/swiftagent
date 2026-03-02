@@ -371,9 +371,7 @@ MIT License — see [LICENSE](LICENSE) for details.
 
 <div align="center">
 
-**Built with ❤️ by [Othmane Blial](https://github.com/OthmaneBlial)**
-
-SwiftAgent is part of the OpenClaw ecosystem.
+**Built with ❤️ by [Othmane BLIAL](https://github.com/OthmaneBlial)**
 
 ⭐ **Star this repo** if you find it useful!
 

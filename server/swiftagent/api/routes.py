@@ -2,7 +2,7 @@
 REST API routes — replaces Electron IPC handlers.
 
 Ported from base/accomplish/apps/desktop/src/main/ipc/handlers.ts (1385 lines).
-Only exposes endpoints for the 3 kept providers and core task/settings operations.
+Supports all 7 providers: OpenAI, xAI, Anthropic, Gemini, DeepSeek, Z-AI, Ollama.
 """
 
 from __future__ import annotations
@@ -15,6 +15,9 @@ from swiftagent.models.provider import (
     ConnectionStatus,
     DEFAULT_MODELS,
     OllamaConfig,
+    PROVIDER_KEY_ENV_VARS,
+    PROVIDER_LABELS,
+    ProviderCatalogEntry,
     ProviderId,
     SelectedModel,
 )
@@ -101,6 +104,21 @@ async def get_providers():
     return settings
 
 
+@router.get("/providers/catalog")
+async def get_provider_catalog():
+    """Return the full provider catalog with labels, env vars, and default models."""
+    catalog: list[ProviderCatalogEntry] = []
+    for pid in ProviderId:
+        catalog.append(ProviderCatalogEntry(
+            id=pid.value,
+            label=PROVIDER_LABELS.get(pid, pid.value),
+            requires_key=pid != ProviderId.OLLAMA,
+            key_env_var=PROVIDER_KEY_ENV_VARS.get(pid),
+            default_models=DEFAULT_MODELS.get(pid, []),
+        ))
+    return catalog
+
+
 @router.get("/providers/models/{provider_id}")
 async def get_models(provider_id: str):
     try:
@@ -120,6 +138,7 @@ async def connect_provider(provider_id: str):
     provider = ConnectedProvider(
         id=pid,
         status=ConnectionStatus.CONNECTED,
+        label=PROVIDER_LABELS.get(pid),
     )
     provider_repo.set_connected_provider(pid, provider)
     return provider
@@ -159,9 +178,31 @@ async def get_ollama_config():
     return config or {"base_url": "http://localhost:11434", "enabled": False}
 
 
+@router.get("/onboard/status")
+async def get_onboard_status(request: Request):
+    """Return which providers have API keys configured."""
+    secure = _get_secure_storage(request)
+    results = []
+    for pid in ProviderId:
+        if pid == ProviderId.OLLAMA:
+            results.append({"id": pid.value, "has_key": True, "source": "local"})
+            continue
+        key = secure.get_api_key(pid.value)
+        results.append({
+            "id": pid.value,
+            "has_key": key is not None,
+            "source": "stored" if key else "none",
+        })
+    return results
+
+
 # ═══════════════════════════════════════════════════════════════
-# API Keys
+# API Keys — all providers that require keys
 # ═══════════════════════════════════════════════════════════════
+
+# Providers that support API key storage (all except Ollama)
+_KEY_PROVIDERS = {pid.value for pid in ProviderId if pid != ProviderId.OLLAMA}
+
 
 class ApiKeyBody(BaseModel):
     key: str
@@ -169,7 +210,7 @@ class ApiKeyBody(BaseModel):
 
 @router.post("/keys/{provider}")
 async def store_api_key(provider: str, body: ApiKeyBody, request: Request):
-    if provider not in ("anthropic", "openai"):
+    if provider not in _KEY_PROVIDERS:
         raise HTTPException(400, f"API key storage not supported for: {provider}")
     secure = _get_secure_storage(request)
     secure.store_api_key(provider, body.key)
@@ -199,9 +240,10 @@ async def list_api_keys(request: Request):
     secure = _get_secure_storage(request)
     keys = secure.get_all_api_keys()
     result = []
-    for provider, key in keys.items():
+    for provider_id in _KEY_PROVIDERS:
+        key = keys.get(provider_id)
         result.append({
-            "provider": provider,
+            "provider": provider_id,
             "has_key": key is not None,
         })
     return result

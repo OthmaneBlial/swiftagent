@@ -22,6 +22,13 @@ install-server: ## Install Python dependencies
 install-client: ## Install Node dependencies
 	cd client && npm install
 
+# ─── Onboard ────────────────────────────────────────────
+onboard: ## Interactive provider setup wizard
+	cd server && python -m swiftagent.cli onboard
+
+onboard-show: ## Show current provider config status
+	cd server && python -m swiftagent.cli onboard --show
+
 # ─── Production ─────────────────────────────────────────
 start: ## Start in production mode
 	cd server && python -m swiftagent.main

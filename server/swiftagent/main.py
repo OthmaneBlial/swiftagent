@@ -18,7 +18,9 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from swiftagent.api.routes import router as api_router
 from swiftagent.api.websocket import router as ws_router
+from swiftagent.config import load_dotenv, auto_import_env_keys
 from swiftagent.storage.database import init_database, close_database
+from swiftagent.storage.secure import SecureStorage
 
 
 def _data_dir() -> Path:
@@ -32,15 +34,24 @@ def _data_dir() -> Path:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup / shutdown lifecycle."""
+    # 1. Load .env file
+    load_dotenv()
+
     data_dir = _data_dir()
     data_dir.mkdir(parents=True, exist_ok=True)
 
     # Store on app state so routes can access it
     app.state.data_dir = data_dir
 
-    # Initialize database
+    # 2. Initialize database
     db_path = data_dir / "swiftagent.db"
     init_database(str(db_path))
+
+    # 3. Auto-import API keys from env into SecureStorage
+    secure = SecureStorage(storage_path=str(data_dir))
+    imported = auto_import_env_keys(secure)
+    if imported:
+        print(f"[startup] Auto-imported API keys from env: {', '.join(imported)}")
 
     yield
 
@@ -78,6 +89,9 @@ async def health():
 
 def main():
     """CLI entry point: start server + open browser."""
+    # Load .env early for SWIFTAGENT_* vars
+    load_dotenv()
+
     port = int(os.environ.get("SWIFTAGENT_PORT", "8000"))
     host = os.environ.get("SWIFTAGENT_HOST", "127.0.0.1")
 

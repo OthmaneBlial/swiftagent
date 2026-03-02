@@ -6,6 +6,7 @@ import {
     CheckCircle,
     XCircle,
     Stop,
+    PaperPlaneRight,
 } from '@phosphor-icons/react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
@@ -19,7 +20,10 @@ export default function Execution() {
     const [messages, setMessages] = useState<TaskMessage[]>([]);
     const [status, setStatus] = useState('running');
     const [progress, setProgress] = useState('Starting...');
+    const [reply, setReply] = useState('');
+    const [sending, setSending] = useState(false);
     const scrollRef = useRef<HTMLDivElement>(null);
+    const inputRef = useRef<HTMLTextAreaElement>(null);
 
     // Load task data
     useEffect(() => {
@@ -28,6 +32,9 @@ export default function Execution() {
             setTask(t);
             setMessages(t.messages);
             setStatus(t.status);
+            if (t.status === 'completed' || t.status === 'failed' || t.status === 'cancelled') {
+                setProgress('');
+            }
         });
     }, [taskId]);
 
@@ -48,6 +55,8 @@ export default function Execution() {
                         timestamp: e.timestamp,
                     },
                 ]);
+                setProgress('Agent is responding...');
+                setSending(false);
             })
         );
 
@@ -64,6 +73,8 @@ export default function Execution() {
                 if (e.task_id !== taskId) return;
                 const payload = e.payload as { status: string };
                 setStatus(payload.status);
+                setProgress('');
+                setSending(false);
             })
         );
 
@@ -71,6 +82,7 @@ export default function Execution() {
             ws.on('task:error', (e: WSEvent) => {
                 if (e.task_id !== taskId) return;
                 setStatus('failed');
+                setSending(false);
             })
         );
 
@@ -82,8 +94,19 @@ export default function Execution() {
             })
         );
 
+        // Listen for new task started (from session resume)
+        unsubs.push(
+            ws.on('task:started', (e: WSEvent) => {
+                const payload = e.payload as { id: string; session_id?: string };
+                // If this is a resumed session, navigate to the new task
+                if (payload.id && payload.id !== taskId) {
+                    navigate(`/task/${payload.id}`, { replace: true });
+                }
+            })
+        );
+
         return () => unsubs.forEach((u) => u());
-    }, [taskId]);
+    }, [taskId, navigate]);
 
     // Auto-scroll to bottom
     useEffect(() => {
@@ -97,9 +120,41 @@ export default function Execution() {
         if (taskId) ws.cancelTask(taskId);
     };
 
+    const handleSendReply = () => {
+        const text = reply.trim();
+        if (!text || !task?.session_id) return;
+
+        setSending(true);
+        setProgress('Sending follow-up...');
+
+        // Add user message to the UI immediately
+        setMessages((prev) => [
+            ...prev,
+            {
+                id: Date.now().toString(),
+                role: 'user',
+                content: text,
+                timestamp: new Date().toISOString(),
+            },
+        ]);
+
+        // Resume the session with the new prompt
+        ws.resumeSession(task.session_id, text);
+        setReply('');
+        setStatus('running');
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            handleSendReply();
+        }
+    };
+
     const isRunning = status === 'running' || status === 'pending';
     const isCompleted = status === 'completed';
     const isFailed = status === 'failed' || status === 'cancelled';
+    const canReply = task?.session_id && !sending;
 
     return (
         <div className="flex-1 flex flex-col h-screen">
@@ -126,7 +181,7 @@ export default function Execution() {
                         {isCompleted && (
                             <>
                                 <CheckCircle weight="fill" className="w-3 h-3 text-green-500" />
-                                Completed
+                                Completed — you can send a follow-up below
                             </>
                         )}
                         {isFailed && (
@@ -162,8 +217,8 @@ export default function Execution() {
                         >
                             <div
                                 className={`rounded-2xl px-4 py-3 text-sm leading-relaxed ${msg.role === 'user'
-                                        ? 'bg-primary text-primary-foreground'
-                                        : 'bg-muted text-foreground'
+                                    ? 'bg-primary text-primary-foreground'
+                                    : 'bg-muted text-foreground'
                                     }`}
                             >
                                 {msg.role === 'assistant' ? (
@@ -186,6 +241,66 @@ export default function Execution() {
                         <CircleNotch weight="bold" className="w-6 h-6 text-muted-foreground animate-spin" />
                     </div>
                 )}
+
+                {/* Typing indicator when agent is responding */}
+                {(isRunning || sending) && messages.length > 0 && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        className="max-w-3xl mr-auto"
+                    >
+                        <div className="rounded-2xl px-4 py-3 bg-muted text-muted-foreground text-sm flex items-center gap-2">
+                            <CircleNotch weight="bold" className="w-4 h-4 animate-spin" />
+                            <span>{progress || 'Thinking...'}</span>
+                        </div>
+                    </motion.div>
+                )}
+            </div>
+
+            {/* Reply input — always visible */}
+            <div className="border-t border-border px-4 py-3 shrink-0">
+                <div className="max-w-3xl mx-auto flex items-end gap-2">
+                    <textarea
+                        ref={inputRef}
+                        value={reply}
+                        onChange={(e) => setReply(e.target.value)}
+                        onKeyDown={handleKeyDown}
+                        placeholder={
+                            canReply
+                                ? 'Send a follow-up message...'
+                                : isRunning
+                                    ? 'Waiting for agent to finish...'
+                                    : !task?.session_id
+                                        ? 'Waiting for session...'
+                                        : 'Type a message...'
+                        }
+                        disabled={sending || (isRunning && !isCompleted)}
+                        rows={1}
+                        className="flex-1 resize-none rounded-xl border border-border bg-background px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                        style={{
+                            minHeight: '42px',
+                            maxHeight: '120px',
+                            height: 'auto',
+                            overflow: reply.split('\n').length > 3 ? 'auto' : 'hidden',
+                        }}
+                        onInput={(e) => {
+                            const el = e.currentTarget;
+                            el.style.height = 'auto';
+                            el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
+                        }}
+                    />
+                    <button
+                        onClick={handleSendReply}
+                        disabled={!reply.trim() || !canReply}
+                        className="w-10 h-10 rounded-xl bg-primary text-primary-foreground flex items-center justify-center hover:bg-primary/90 transition-colors disabled:opacity-30 disabled:cursor-not-allowed shrink-0"
+                    >
+                        {sending ? (
+                            <CircleNotch weight="bold" className="w-4 h-4 animate-spin" />
+                        ) : (
+                            <PaperPlaneRight weight="fill" className="w-4 h-4" />
+                        )}
+                    </button>
+                </div>
             </div>
         </div>
     );

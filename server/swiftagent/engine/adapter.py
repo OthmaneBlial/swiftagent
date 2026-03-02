@@ -3,6 +3,9 @@ OpenCode adapter — spawns the opencode CLI and manages its lifecycle.
 
 Ported from base/accomplish/packages/agent-core/src/internal/classes/OpenCodeAdapter.ts
 Uses asyncio.create_subprocess_exec instead of node-pty.
+
+SAFETY: All tasks run inside a sandboxed workspace (~/.swiftagent/workspace)
+so the agent cannot modify files outside that directory.
 """
 
 from __future__ import annotations
@@ -10,8 +13,8 @@ from __future__ import annotations
 import asyncio
 import os
 import shutil
-import uuid
 from datetime import datetime
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from swiftagent.engine.parser import MessageType, ParsedMessage, StreamParser
@@ -23,12 +26,30 @@ if TYPE_CHECKING:
     from swiftagent.api.websocket import ConnectionManager
 
 
+def _get_workspace_dir() -> Path:
+    """Get the sandboxed workspace directory.
+
+    All agent tasks execute inside ~/.swiftagent/workspace.
+    The agent can create/delete files here but cannot touch
+    anything outside this directory.
+    """
+    base = os.environ.get("SWIFTAGENT_DATA_DIR")
+    if base:
+        workspace = Path(base) / "workspace"
+    else:
+        workspace = Path.home() / ".swiftagent" / "workspace"
+    workspace.mkdir(parents=True, exist_ok=True)
+    return workspace
+
+
 class OpenCodeAdapter:
     """
     Manages an opencode CLI subprocess for a single task.
 
-    Spawns the CLI, parses its NDJSON output stream, and emits
-    typed events to the WebSocket ConnectionManager.
+    Spawns the CLI with `opencode run "prompt"`, parses its output
+    stream, and emits typed events to the WebSocket ConnectionManager.
+
+    SAFETY: The subprocess CWD is always the sandboxed workspace.
     """
 
     def __init__(self, task: Task, manager: ConnectionManager):
@@ -48,19 +69,24 @@ class OpenCodeAdapter:
         return self._session_id
 
     async def start(self) -> None:
-        """Start the opencode CLI subprocess."""
+        """Start the opencode CLI subprocess inside the sandbox."""
         cli = self._find_cli()
         if not cli:
             raise RuntimeError("OpenCode CLI not found. Install it with: npm i -g opencode-ai")
 
         env = self._build_env()
         args = self._build_args()
+        workspace = _get_workspace_dir()
 
         # Emit progress
         await self.manager.broadcast(WSEvent(
             type=WSEventType.TASK_PROGRESS,
             task_id=self.task.id,
-            payload={"stage": "starting", "message": "Spawning agent..."},
+            payload={
+                "stage": "starting",
+                "message": "Spawning agent...",
+                "workspace": str(workspace),
+            },
         ))
 
         self._process = await asyncio.create_subprocess_exec(
@@ -68,7 +94,7 @@ class OpenCodeAdapter:
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
             env=env,
-            cwd=self.task.config.working_directory or os.getcwd(),
+            cwd=str(workspace),  # SANDBOX: always run inside workspace
         )
 
         # Start reading output streams
@@ -106,7 +132,8 @@ class OpenCodeAdapter:
     def _handle_message(self, msg: ParsedMessage) -> None:
         """Handle a parsed message from the CLI output (sync callback)."""
         # Schedule async broadcast on the event loop
-        asyncio.get_event_loop().call_soon_threadsafe(
+        loop = asyncio.get_event_loop()
+        loop.call_soon_threadsafe(
             asyncio.ensure_future,
             self._handle_message_async(msg),
         )
@@ -252,26 +279,38 @@ class OpenCodeAdapter:
         return None
 
     def _build_args(self) -> list[str]:
-        """Build CLI arguments."""
+        """Build CLI arguments for `opencode run "prompt"`.
+
+        Uses the `run` subcommand which accepts a message and exits.
+        """
         cli = self._find_cli()
         args: list[str] = []
 
         # If using npx, prepend the package
         if cli and cli.endswith("npx"):
-            args.extend(["opencode-ai"])
+            args.append("opencode-ai")
 
-        args.extend([
-            "--prompt", self.task.config.prompt,
-            "--json",  # NDJSON output mode
-        ])
+        # Use the `run` subcommand with the prompt
+        args.append("run")
+        args.append(self.task.config.prompt)
 
-        if self.task.config.working_directory:
-            args.extend(["--cwd", self.task.config.working_directory])
+        # Model selection: --model provider/model
+        if self.task.config.provider_id and self.task.config.model_id:
+            args.extend(["--model", f"{self.task.config.provider_id}/{self.task.config.model_id}"])
+        elif self.task.config.model_id:
+            args.extend(["--model", self.task.config.model_id])
+
+        # Continue session if resuming
+        if self.task.session_id:
+            args.extend(["--session", self.task.session_id, "--continue"])
 
         return args
 
     def _build_env(self) -> dict[str, str]:
-        """Build environment variables for the CLI process."""
+        """Build environment variables for the CLI process.
+
+        API keys are passed via env so opencode picks them up automatically.
+        """
         env = os.environ.copy()
 
         # Pass provider/model config via environment

@@ -1,0 +1,10 @@
+{
+  "name": "swiftagent",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "make dev",
+    "install:all": "make install",
+    "test": "make test"
+  }
+}

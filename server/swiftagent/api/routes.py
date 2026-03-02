@@ -16,6 +16,7 @@ from swiftagent.models.settings import AppSettings
 from swiftagent.models.task import Task
 from swiftagent.storage import settings as settings_repo
 from swiftagent.storage import tasks as task_repo
+from swiftagent.tools.sandbox import check_bwrap_usable
 from swiftagent.tools.workspace import get_workspace_dir, require_workspace_path
 
 router = APIRouter()
@@ -157,14 +158,25 @@ async def engine_status(probe_auth: bool = Query(default=False)):
     claude_path = _resolve_claude_path()
     bwrap_available = shutil.which("bwrap") is not None
     sandbox_mode = settings_repo.get_sandbox_mode()
-    strict_active = sandbox_mode == "strict" and bwrap_available
+    workspace = get_workspace_dir()
 
-    degraded = sandbox_mode == "strict" and not bwrap_available
-    degraded_reason = (
-        "sandbox_mode is strict but bwrap is unavailable; fallback sandboxing is active"
-        if degraded
-        else None
-    )
+    bwrap_usable = False
+    bwrap_reason = None
+    if bwrap_available:
+        bwrap_usable, bwrap_reason = check_bwrap_usable(workspace)
+
+    strict_active = sandbox_mode == "strict" and bwrap_usable
+    degraded = sandbox_mode == "strict" and not strict_active
+    degraded_reason = None
+    if degraded:
+        if not bwrap_available:
+            degraded_reason = "sandbox_mode is strict but bwrap is missing; fallback sandboxing is active"
+        else:
+            degraded_reason = (
+                "sandbox_mode is strict but bwrap is unusable; fallback sandboxing is active"
+            )
+            if bwrap_reason:
+                degraded_reason = f"{degraded_reason} ({bwrap_reason})"
 
     if probe_auth:
         status, message = _probe_auth(claude_path, settings_repo.get_claude_model())
@@ -176,6 +188,8 @@ async def engine_status(probe_auth: bool = Query(default=False)):
         "claude_cli_available": claude_path is not None,
         "claude_cli_path": claude_path,
         "bwrap_available": bwrap_available,
+        "bwrap_usable": bwrap_usable,
+        "bwrap_reason": bwrap_reason,
         "workspace_dir": settings_repo.get_workspace_dir(),
         "sandbox_mode": sandbox_mode,
         "strict_sandbox_active": strict_active,

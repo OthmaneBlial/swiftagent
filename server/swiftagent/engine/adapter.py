@@ -14,6 +14,7 @@ from swiftagent.models.events import WSEvent, WSEventType
 from swiftagent.models.task import Task, TaskMessage, TaskResult, TaskStatus
 from swiftagent.storage import settings as settings_repo
 from swiftagent.storage import tasks as task_repo
+from swiftagent.tools.sandbox import check_bwrap_usable
 from swiftagent.tools.workspace import get_workspace_dir
 
 if TYPE_CHECKING:
@@ -58,7 +59,7 @@ class ClaudeAdapter:
 
         workspace = get_workspace_dir()
         env = self._build_env()
-        command = self._build_command(claude_path, workspace)
+        command, sandbox_notice = self._build_command(claude_path, workspace)
 
         await self.manager.broadcast(
             WSEvent(
@@ -71,6 +72,16 @@ class ClaudeAdapter:
                 },
             )
         )
+
+        if sandbox_notice:
+            print(f"[Sandbox] {sandbox_notice}")
+            await self.manager.broadcast(
+                WSEvent(
+                    type=WSEventType.TASK_PROGRESS,
+                    task_id=self.task.id,
+                    payload={"stage": "sandbox", "message": sandbox_notice},
+                )
+            )
 
         self._process = await asyncio.create_subprocess_exec(
             *command,
@@ -354,44 +365,63 @@ class ClaudeAdapter:
         args.append(self.task.config.prompt)
         return args
 
-    def _build_command(self, claude_path: str, workspace: Path) -> list[str]:
+    def _build_command(self, claude_path: str, workspace: Path) -> tuple[list[str], str | None]:
         args = self._build_claude_args()
 
         sandbox_mode = settings_repo.get_sandbox_mode()
         bwrap_path = shutil.which("bwrap")
-        if sandbox_mode == "strict" and bwrap_path:
+        if sandbox_mode == "strict":
+            if not bwrap_path:
+                return (
+                    [claude_path, *args],
+                    "Strict sandbox requested but bwrap is not installed. Falling back to guarded mode.",
+                )
+
+            bwrap_usable, reason = check_bwrap_usable(workspace)
+            if not bwrap_usable:
+                return (
+                    [claude_path, *args],
+                    (
+                        "Strict sandbox requested but bwrap is unavailable in this environment "
+                        f"({reason or 'unknown error'}). Falling back to guarded mode."
+                    ),
+                )
+
             claude_dir = Path.home() / ".claude"
             claude_dir.mkdir(parents=True, exist_ok=True)
 
-            return [
-                bwrap_path,
-                "--die-with-parent",
-                "--ro-bind",
-                "/",
-                "/",
-                "--dev-bind",
-                "/dev",
-                "/dev",
-                "--proc",
-                "/proc",
-                "--tmpfs",
-                "/tmp",
-                "--bind",
-                str(workspace),
-                str(workspace),
-                "--bind",
-                str(claude_dir),
-                str(claude_dir),
-                "--chdir",
-                str(workspace),
-                "--setenv",
-                "HOME",
-                str(Path.home()),
-                claude_path,
-                *args,
-            ]
+            return (
+                [
+                    bwrap_path,
+                    "--die-with-parent",
+                    "--ro-bind",
+                    "/",
+                    "/",
+                    "--dev-bind",
+                    "/dev",
+                    "/dev",
+                    "--proc",
+                    "/proc",
+                    "--tmpfs",
+                    "/tmp",
+                    "--bind",
+                    str(workspace),
+                    str(workspace),
+                    "--bind",
+                    str(claude_dir),
+                    str(claude_dir),
+                    "--chdir",
+                    str(workspace),
+                    "--setenv",
+                    "HOME",
+                    str(Path.home()),
+                    claude_path,
+                    *args,
+                ],
+                None,
+            )
 
-        return [claude_path, *args]
+        return [claude_path, *args], None
 
     def _build_env(self) -> dict[str, str]:
         env = os.environ.copy()

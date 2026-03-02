@@ -187,10 +187,14 @@ export default function Settings() {
                             <p>Claude CLI: {engineStatus.claude_cli_available ? 'available' : 'missing'}</p>
                             <p>CLI path: {engineStatus.claude_cli_path || '(auto)'}</p>
                             <p>bwrap: {engineStatus.bwrap_available ? 'available' : 'missing'}</p>
+                            {engineStatus.bwrap_available ? (
+                                <p>bwrap usable: {engineStatus.bwrap_usable ? 'yes' : 'no'}</p>
+                            ) : null}
                             <p>Sandbox mode: {engineStatus.sandbox_mode}</p>
                             <p>Strict sandbox active: {engineStatus.strict_sandbox_active ? 'yes' : 'no'}</p>
                             <p>Workspace: {engineStatus.workspace_dir}</p>
                             <p>Auth probe: {engineStatus.auth_probe.status}</p>
+                            {engineStatus.bwrap_reason ? <p>{engineStatus.bwrap_reason}</p> : null}
                             {engineStatus.degraded_reason ? <p className="text-amber-600">{engineStatus.degraded_reason}</p> : null}
                         </div>
                     ) : (

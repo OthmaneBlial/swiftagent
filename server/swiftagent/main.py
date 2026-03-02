@@ -18,9 +18,9 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from swiftagent.api.routes import router as api_router
 from swiftagent.api.websocket import router as ws_router
-from swiftagent.config import load_dotenv, auto_import_env_keys
+from swiftagent.config import load_dotenv
 from swiftagent.storage.database import init_database, close_database
-from swiftagent.storage.secure import SecureStorage
+from swiftagent.storage import settings as settings_repo
 
 
 def _data_dir() -> Path:
@@ -47,11 +47,9 @@ async def lifespan(app: FastAPI):
     db_path = data_dir / "swiftagent.db"
     init_database(str(db_path))
 
-    # 3. Auto-import API keys from env into SecureStorage
-    secure = SecureStorage(storage_path=str(data_dir))
-    imported = auto_import_env_keys(secure)
-    if imported:
-        print(f"[startup] Auto-imported API keys from env: {', '.join(imported)}")
+    # 3. Ensure configured workspace exists
+    workspace = Path(settings_repo.get_workspace_dir()).expanduser()
+    workspace.mkdir(parents=True, exist_ok=True)
 
     yield
 

@@ -1,13 +1,49 @@
 import { useEffect } from 'react';
 import Router from './router';
-import { ws } from './lib/swiftagent';
+import { api, ws } from './lib/swiftagent';
+import { applyTheme } from './lib/theme';
+import ToastViewport from './components/ui/ToastViewport';
+import { toast } from './lib/toast';
+
+let wsConsumers = 0;
 
 export default function App() {
-  useEffect(() => {
-    // Connect WebSocket on mount
-    ws.connect();
-    return () => ws.disconnect();
-  }, []);
+    useEffect(() => {
+        wsConsumers += 1;
+        ws.connect();
 
-  return <Router />;
+        return () => {
+            wsConsumers -= 1;
+            if (wsConsumers <= 0) {
+                ws.disconnect();
+            }
+        };
+    }, []);
+
+    useEffect(() => {
+        let cancelled = false;
+
+        api.getSettings()
+            .then((settings) => {
+                if (!cancelled) {
+                    applyTheme(settings.theme);
+                }
+            })
+            .catch((error: Error) => {
+                if (!cancelled) {
+                    toast.error('Failed to load settings', error.message);
+                }
+            });
+
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+
+    return (
+        <>
+            <Router />
+            <ToastViewport />
+        </>
+    );
 }

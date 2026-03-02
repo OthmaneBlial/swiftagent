@@ -2,6 +2,7 @@ import { Outlet, Link, useLocation } from 'react-router';
 import {
     Lightning,
     ClockCounterClockwise,
+    FolderSimple,
     GearSix,
 } from '@phosphor-icons/react';
 import { cn } from '../../lib/utils';
@@ -9,10 +10,12 @@ import { cn } from '../../lib/utils';
 const navItems = [
     { path: '/', icon: Lightning, label: 'Tasks' },
     { path: '/history', icon: ClockCounterClockwise, label: 'History' },
+    { path: '/files', icon: FolderSimple, label: 'Files' },
 ];
 
 export default function Layout() {
     const location = useLocation();
+    const isTaskPath = location.pathname === '/' || location.pathname.startsWith('/task/');
 
     return (
         <div className="min-h-screen bg-background flex">
@@ -26,7 +29,10 @@ export default function Layout() {
                 {/* Navigation */}
                 {navItems.map((item) => {
                     const Icon = item.icon;
-                    const active = location.pathname === item.path;
+                    const active =
+                        item.path === '/'
+                            ? isTaskPath
+                            : location.pathname === item.path || location.pathname.startsWith(`${item.path}/`);
                     return (
                         <Link
                             key={item.path}
@@ -49,10 +55,18 @@ export default function Layout() {
                 {/* Settings */}
                 <Link
                     to="/settings"
-                    className="w-10 h-10 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors"
+                    className={cn(
+                        'w-10 h-10 rounded-lg flex items-center justify-center transition-colors',
+                        location.pathname === '/settings'
+                            ? 'bg-accent text-foreground'
+                            : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
+                    )}
                     title="Settings"
                 >
-                    <GearSix weight="regular" className="w-5 h-5" />
+                    <GearSix
+                        weight={location.pathname === '/settings' ? 'fill' : 'regular'}
+                        className="w-5 h-5"
+                    />
                 </Link>
             </aside>
 

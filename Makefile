@@ -23,10 +23,10 @@ install-client: ## Install Node dependencies
 	cd client && npm install
 
 # ─── Onboard ────────────────────────────────────────────
-onboard: ## Interactive provider setup wizard
+onboard: ## Interactive Claude setup wizard
 	cd server && python -m swiftagent.cli onboard
 
-onboard-show: ## Show current provider config status
+onboard-show: ## Show current Claude readiness status
 	cd server && python -m swiftagent.cli onboard --show
 
 # ─── Production ─────────────────────────────────────────

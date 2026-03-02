@@ -50,7 +50,6 @@ class TaskConfig(BaseModel):
     prompt: str
     working_directory: str | None = None
     attachments: list[TaskAttachment] = Field(default_factory=list)
-    provider_id: str | None = None
     model_id: str | None = None
 
 

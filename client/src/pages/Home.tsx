@@ -2,12 +2,14 @@ import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { PaperPlaneRight, Sparkle, CircleNotch } from '@phosphor-icons/react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ws, api, type Task } from '../lib/swiftagent';
+import { ws } from '../lib/swiftagent';
+import { toast } from '../lib/toast';
 
 export default function Home() {
     const [prompt, setPrompt] = useState('');
     const [loading, setLoading] = useState(false);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
+    const startTimeoutRef = useRef<number | null>(null);
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -16,14 +18,33 @@ export default function Home() {
 
     // Listen for task:started to navigate to execution page
     useEffect(() => {
-        const unsub = ws.on('task:started', (event) => {
+        const unsubStarted = ws.on('task:started', (event) => {
             const taskId = event.task_id || (event.payload as { id?: string })?.id;
             if (taskId) {
                 setLoading(false);
+                if (startTimeoutRef.current) {
+                    window.clearTimeout(startTimeoutRef.current);
+                    startTimeoutRef.current = null;
+                }
                 navigate(`/task/${taskId}`);
             }
         });
-        return unsub;
+        const unsubError = ws.on('task:error', (event) => {
+            if (event.task_id) {
+                return;
+            }
+            const payload = event.payload as { error?: string };
+            setLoading(false);
+            toast.error('Failed to start task', payload.error || 'Unknown error');
+        });
+        return () => {
+            unsubStarted();
+            unsubError();
+            if (startTimeoutRef.current) {
+                window.clearTimeout(startTimeoutRef.current);
+                startTimeoutRef.current = null;
+            }
+        };
     }, [navigate]);
 
     const handleSubmit = async () => {
@@ -32,6 +53,13 @@ export default function Home() {
 
         setLoading(true);
         ws.startTask({ prompt: trimmed });
+        if (startTimeoutRef.current) {
+            window.clearTimeout(startTimeoutRef.current);
+        }
+        startTimeoutRef.current = window.setTimeout(() => {
+            setLoading(false);
+            toast.error('Task start timed out', 'No response from server. Check backend and WebSocket connection.');
+        }, 15000);
     };
 
     const handleKeyDown = (e: React.KeyboardEvent) => {

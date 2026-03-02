@@ -9,26 +9,51 @@ import {
 } from '@phosphor-icons/react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { api, type Task } from '../lib/swiftagent';
+import { toast } from '../lib/toast';
 
 export default function History() {
     const [tasks, setTasks] = useState<Task[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        api.listTasks().then((t) => {
-            setTasks(t);
-            setLoading(false);
-        });
+        let cancelled = false;
+        api.listTasks()
+            .then((t) => {
+                if (cancelled) return;
+                setTasks(t);
+            })
+            .catch((error: Error) => {
+                if (cancelled) return;
+                toast.error('Failed to load history', error.message);
+            })
+            .finally(() => {
+                if (!cancelled) {
+                    setLoading(false);
+                }
+            });
+
+        return () => {
+            cancelled = true;
+        };
     }, []);
 
     const handleDelete = async (taskId: string) => {
-        await api.deleteTask(taskId);
-        setTasks((prev) => prev.filter((t) => t.id !== taskId));
+        try {
+            await api.deleteTask(taskId);
+            setTasks((prev) => prev.filter((t) => t.id !== taskId));
+        } catch (error) {
+            toast.error('Failed to delete task', (error as Error).message);
+        }
     };
 
     const handleClearAll = async () => {
-        await api.clearHistory();
-        setTasks([]);
+        if (!window.confirm('Clear all task history?')) return;
+        try {
+            await api.clearHistory();
+            setTasks([]);
+        } catch (error) {
+            toast.error('Failed to clear history', (error as Error).message);
+        }
     };
 
     const statusIcon = (status: string) => {

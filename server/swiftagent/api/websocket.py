@@ -38,7 +38,8 @@ class ConnectionManager:
         print(f"[WS] Client connected ({len(self._connections)} total)")
 
     def disconnect(self, ws: WebSocket) -> None:
-        self._connections.remove(ws)
+        if ws in self._connections:
+            self._connections.remove(ws)
         print(f"[WS] Client disconnected ({len(self._connections)} total)")
 
     async def broadcast(self, event: WSEvent) -> None:

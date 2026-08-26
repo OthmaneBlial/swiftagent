@@ -14,7 +14,7 @@ _db: sqlite3.Connection | None = None
 _db_path: str | None = None
 _lock = threading.RLock()
 
-CURRENT_SCHEMA_VERSION = 2
+CURRENT_SCHEMA_VERSION = 3
 
 
 def init_database(db_path: str) -> sqlite3.Connection:
@@ -83,6 +83,8 @@ def _run_migrations(db: sqlite3.Connection) -> None:
         _migrate_v1(db)
     if current_version < 2:
         _migrate_v2(db)
+    if current_version < 3:
+        _migrate_v3(db)
 
     if current_version == 0:
         db.execute("INSERT INTO schema_version (version) VALUES (?)", (CURRENT_SCHEMA_VERSION,))
@@ -162,3 +164,24 @@ def _migrate_v2(db: sqlite3.Connection) -> None:
     db.execute(
         "CREATE INDEX IF NOT EXISTS idx_tasks_status_created_at ON tasks(status, created_at DESC)"
     )
+
+
+def _migrate_v3(db: sqlite3.Connection) -> None:
+    """Persist agent identity, adapter identity, and run capability snapshots."""
+    columns = {row["name"] for row in db.execute("PRAGMA table_info(tasks)").fetchall()}
+    additions = {
+        "agent_id": "TEXT NOT NULL DEFAULT 'claude-code'",
+        "adapter_id": "TEXT NOT NULL DEFAULT 'claude-stream-json'",
+        "adapter_version": "TEXT NOT NULL DEFAULT '0.3.0'",
+        "native_session_id": "TEXT",
+        "capability_snapshot_json": "TEXT NOT NULL DEFAULT '{}'",
+    }
+    for name, declaration in additions.items():
+        if name not in columns:
+            db.execute(f"ALTER TABLE tasks ADD COLUMN {name} {declaration}")
+
+    db.execute(
+        "UPDATE tasks SET native_session_id = session_id "
+        "WHERE native_session_id IS NULL AND session_id IS NOT NULL"
+    )
+    db.execute("CREATE INDEX IF NOT EXISTS idx_tasks_agent_created_at ON tasks(agent_id, created_at DESC)")

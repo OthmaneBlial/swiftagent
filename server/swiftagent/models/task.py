@@ -51,6 +51,7 @@ class TaskConfig(BaseModel):
     """Configuration to start a new task."""
 
     prompt: str = Field(min_length=1, max_length=MAX_PROMPT_CHARS)
+    agent_id: str = Field(default="claude-code", pattern=r"^[a-z0-9][a-z0-9-]{0,63}$")
     working_directory: str | None = Field(default=None, max_length=4_096)
     attachments: list[TaskAttachment] = Field(default_factory=list, max_length=MAX_ATTACHMENTS)
     model_id: str | None = Field(default=None, max_length=256)
@@ -88,6 +89,12 @@ class Task(BaseModel):
     status: TaskStatus = TaskStatus.PENDING
     messages: list[TaskMessage] = Field(default_factory=list)
     result: TaskResult | None = None
+    agent_id: str = "claude-code"
+    adapter_id: str = "claude-stream-json"
+    adapter_version: str = "0.3.0"
+    native_session_id: str | None = None
+    capability_snapshot: dict[str, Any] = Field(default_factory=dict)
+    # Kept through v0.x for API compatibility; mirrors native_session_id.
     session_id: str | None = None
     summary: str | None = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))

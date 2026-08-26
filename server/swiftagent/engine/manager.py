@@ -8,7 +8,8 @@ from collections import deque
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
-from swiftagent.engine.adapter import ClaudeAdapter
+from swiftagent.agents.base import AgentAdapter
+from swiftagent.agents.registry import AgentRegistry, agent_registry
 from swiftagent.models.task import Task, TaskConfig, TaskMessage, TaskStatus
 from swiftagent.storage import tasks as task_repo
 from swiftagent.tools.workspace import WorkspacePathError, resolve_workspace_path
@@ -23,9 +24,10 @@ class TaskManager:
     MAX_CONCURRENT = 5
     MAX_QUEUED = 25
 
-    def __init__(self):
-        self._active: dict[str, ClaudeAdapter] = {}
-        self._queued: deque[ClaudeAdapter] = deque()
+    def __init__(self, registry: AgentRegistry | None = None):
+        self._registry = registry or agent_registry
+        self._active: dict[str, AgentAdapter] = {}
+        self._queued: deque[AgentAdapter] = deque()
         self._lock = asyncio.Lock()
 
     async def start_task(self, config: TaskConfig, manager: ConnectionManager) -> Task:
@@ -39,15 +41,28 @@ class TaskManager:
         session_id: str | None = None,
     ) -> Task:
         config = self._validate_config(config)
-        task = Task(config=config, status=TaskStatus.RUNNING, session_id=session_id)
+        definition = self._registry.definition(config.agent_id)
+        task = Task(
+            config=config,
+            status=TaskStatus.RUNNING,
+            agent_id=definition.agent_id,
+            adapter_id=definition.adapter_id,
+            adapter_version=definition.adapter_version,
+            native_session_id=session_id,
+            capability_snapshot=definition.capabilities.model_dump(),
+            session_id=session_id,
+        )
 
         user_msg = TaskMessage(role="user", content=config.prompt)
         task.messages.append(user_msg)
 
+        # Construct the adapter before persisting a running task so a broken
+        # factory cannot leave an orphaned record behind.
+        adapter = self._registry.create(config.agent_id, task, manager)
+
         task_repo.save_task(task)
         task_repo.add_task_message(task.id, user_msg)
 
-        adapter = ClaudeAdapter(task, manager)
         should_start = False
 
         async with self._lock:
@@ -81,7 +96,7 @@ class TaskManager:
             raise ValueError("Working directory does not exist or is not a directory")
         return config.model_copy(update={"working_directory": str(working_directory)})
 
-    async def _run_adapter(self, task_id: str, adapter: ClaudeAdapter) -> None:
+    async def _run_adapter(self, task_id: str, adapter: AgentAdapter) -> None:
         timeout_sec = int(os.environ.get("SWIFTAGENT_TASK_TIMEOUT_SEC", "900"))
 
         try:
@@ -100,7 +115,7 @@ class TaskManager:
             await self._start_next()
 
     async def _start_next(self) -> None:
-        adapter: ClaudeAdapter | None = None
+        adapter: AgentAdapter | None = None
         async with self._lock:
             if self._queued and len(self._active) < self.MAX_CONCURRENT:
                 adapter = self._queued.popleft()
@@ -112,7 +127,7 @@ class TaskManager:
             asyncio.create_task(self._run_adapter(adapter.task.id, adapter))
 
     async def cancel_task(self, task_id: str) -> None:
-        queued_adapter: ClaudeAdapter | None = None
+        queued_adapter: AgentAdapter | None = None
         async with self._lock:
             adapter = self._active.pop(task_id, None)
             if adapter is None:
@@ -139,13 +154,20 @@ class TaskManager:
         task_repo.update_task_status(task_id, TaskStatus.CANCELLED, datetime.now(UTC))
 
     async def resume_session(
-        self, session_id: str, prompt: str, manager: ConnectionManager
+        self,
+        session_id: str,
+        prompt: str,
+        manager: ConnectionManager,
+        *,
+        agent_id: str = "claude-code",
     ) -> Task:
         normalized_session_id = session_id.strip()
         if not normalized_session_id:
             raise ValueError("Session id is required to resume a task")
         return await self._create_task(
-            TaskConfig(prompt=prompt), manager, session_id=normalized_session_id
+            TaskConfig(prompt=prompt, agent_id=agent_id),
+            manager,
+            session_id=normalized_session_id,
         )
 
     def get_active_task_ids(self) -> list[str]:

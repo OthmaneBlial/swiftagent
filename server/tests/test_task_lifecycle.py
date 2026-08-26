@@ -4,7 +4,9 @@ import asyncio
 
 import pytest
 
+from swiftagent.agents.registry import AgentRegistry
 from swiftagent.engine.adapter import ClaudeAdapter
+from swiftagent.models.agent import AgentCapabilities, AgentDefinition
 from swiftagent.models.task import Task, TaskConfig, TaskResult, TaskStatus
 from swiftagent.storage import tasks as task_repo
 
@@ -35,7 +37,7 @@ def test_terminal_result_survives_reload_and_restart_recovery(client):
 
 
 @pytest.mark.asyncio
-async def test_queued_task_starts_when_a_slot_becomes_available(client, monkeypatch):
+async def test_queued_task_starts_when_a_slot_becomes_available(client):
     import swiftagent.engine.manager as manager_module
 
     started = asyncio.Event()
@@ -61,13 +63,30 @@ async def test_queued_task_starts_when_a_slot_becomes_available(client, monkeypa
         def dispose(self):
             pass
 
-    monkeypatch.setattr(manager_module, "ClaudeAdapter", FakeAdapter)
-    task_manager = manager_module.TaskManager()
+    registry = AgentRegistry()
+    registry.register(
+        AgentDefinition(
+            agent_id="fake-agent",
+            display_name="Fake Agent",
+            adapter_id="fake-adapter",
+            adapter_version="1.0.0",
+            protocol="test",
+            capabilities=AgentCapabilities(),
+        ),
+        FakeAdapter,
+    )
+    task_manager = manager_module.TaskManager(registry)
     task_manager.MAX_CONCURRENT = 1
     task_manager._active["occupied"] = object()  # Occupy the only slot without a subprocess.
 
-    task = await task_manager.start_task(TaskConfig(prompt="Queued work"), object())
+    task = await task_manager.start_task(
+        TaskConfig(prompt="Queued work", agent_id="fake-agent"), object()
+    )
     assert task.status is TaskStatus.QUEUED
+    assert task.agent_id == "fake-agent"
+    assert task.adapter_id == "fake-adapter"
+    assert task.adapter_version == "1.0.0"
+    assert task.capability_snapshot["session_create"] is True
     assert len(task_manager._queued) == 1
 
     task_manager._active.clear()

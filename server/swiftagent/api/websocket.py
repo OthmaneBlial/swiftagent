@@ -193,7 +193,15 @@ async def _handle_client_event(
 
         session_id = payload.get("session_id", "")
         prompt = payload.get("prompt", "")
-        task = await task_manager.resume_session(session_id, prompt, manager)
+        agent_id = payload.get("agent_id", "claude-code")
+        if not isinstance(agent_id, str):
+            raise ValueError("agent_id must be a string")
+        task = await task_manager.resume_session(
+            session_id,
+            prompt,
+            manager,
+            agent_id=agent_id,
+        )
         await manager.send(
             ws,
             WSEvent(

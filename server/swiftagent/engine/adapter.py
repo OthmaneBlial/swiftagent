@@ -39,7 +39,7 @@ class ClaudeAdapter:
         self._stderr_task: asyncio.Task | None = None
         self._wait_task: asyncio.Task | None = None
 
-        self._session_id: str | None = task.session_id
+        self._session_id: str | None = task.native_session_id or task.session_id
         self._parser = StreamParser(self._handle_message)
 
         self._completion_lock = asyncio.Lock()
@@ -175,6 +175,8 @@ class ClaudeAdapter:
     async def _handle_message_async(self, msg: ParsedMessage) -> None:
         if msg.type == MessageType.SESSION_ID:
             self._session_id = msg.content
+            self.task.native_session_id = msg.content
+            self.task.session_id = msg.content
             task_repo.update_task_session_id(self.task.id, msg.content)
             return
 
@@ -291,6 +293,7 @@ class ClaudeAdapter:
             self.task.result = result
             self.task.completed_at = now
             self.task.summary = summary
+            self.task.native_session_id = self._session_id
             self.task.session_id = self._session_id
             task_repo.complete_task(self.task, result)
 

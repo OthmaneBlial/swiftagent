@@ -39,8 +39,10 @@ def save_task(task: Task) -> None:
     db.execute(
         """
         INSERT INTO tasks (id, prompt, working_directory, status,
-            session_id, summary, result_json, config_json, created_at, completed_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            session_id, summary, result_json, config_json, created_at, completed_at,
+            agent_id, adapter_id, adapter_version, native_session_id,
+            capability_snapshot_json)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             task.id,
@@ -53,6 +55,11 @@ def save_task(task: Task) -> None:
             task.config.model_dump_json(),
             task.created_at.isoformat(),
             task.completed_at.isoformat() if task.completed_at else None,
+            task.agent_id,
+            task.adapter_id,
+            task.adapter_version,
+            task.native_session_id or task.session_id,
+            json.dumps(task.capability_snapshot),
         ),
     )
     db.commit()
@@ -73,16 +80,19 @@ def complete_task(task: Task, result: TaskResult) -> None:
     """Persist terminal state and result in one transaction."""
     db = get_database()
     completed_at = task.completed_at or datetime.now(UTC)
+    native_session_id = task.native_session_id or task.session_id
     db.execute(
         """
         UPDATE tasks
-        SET status = ?, completed_at = ?, session_id = ?, summary = ?, result_json = ?
+        SET status = ?, completed_at = ?, session_id = ?, native_session_id = ?,
+            summary = ?, result_json = ?
         WHERE id = ?
         """,
         (
             task.status.value,
             completed_at.isoformat(),
-            task.session_id,
+            native_session_id,
+            native_session_id,
             task.summary,
             result.model_dump_json(),
             task.id,
@@ -92,8 +102,16 @@ def complete_task(task: Task, result: TaskResult) -> None:
 
 
 def update_task_session_id(task_id: str, session_id: str) -> None:
+    """Compatibility alias for native agent session persistence."""
+    update_task_native_session_id(task_id, session_id)
+
+
+def update_task_native_session_id(task_id: str, session_id: str) -> None:
     db = get_database()
-    db.execute("UPDATE tasks SET session_id = ? WHERE id = ?", (session_id, task_id))
+    db.execute(
+        "UPDATE tasks SET session_id = ?, native_session_id = ? WHERE id = ?",
+        (session_id, session_id, task_id),
+    )
     db.commit()
 
 
@@ -223,6 +241,11 @@ def _row_to_task(row: dict) -> Task:
         id=row["id"],
         config=config,
         status=TaskStatus(row["status"]),
+        agent_id=row["agent_id"],
+        adapter_id=row["adapter_id"],
+        adapter_version=row["adapter_version"],
+        native_session_id=row["native_session_id"] or row["session_id"],
+        capability_snapshot=json.loads(row["capability_snapshot_json"] or "{}"),
         session_id=row["session_id"],
         summary=row["summary"],
         result=result,

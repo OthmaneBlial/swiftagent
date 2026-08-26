@@ -1,0 +1,3 @@
+{"type":"system","subtype":"init","session_id":"fixture-session-failed","tools":[],"model":"claude-fixture"}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"The requested operation cannot continue."}]}}
+{"type":"result","subtype":"error_during_execution","is_error":true,"result":"Permission denied by fixture policy.","session_id":"fixture-session-failed","duration_ms":40,"num_turns":1}

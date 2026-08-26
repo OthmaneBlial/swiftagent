@@ -1,0 +1,4 @@
+not-json
+{"type":"unknown","payload":"ignored but valid JSON"}
+{"type":"assistant","message":{"role":"assistant","content":"A plain string content block is accepted."}}
+{"error":"Synthetic top-level stream error"}

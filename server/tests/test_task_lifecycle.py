@@ -182,7 +182,6 @@ async def test_resume_keeps_original_agent_workspace_and_model(client):
         "fixture-session",
         "Continue safely",
         object(),
-        agent_id="fixture-agent",
     )
     await asyncio.wait_for(done.wait(), timeout=1)
 

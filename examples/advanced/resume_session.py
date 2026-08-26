@@ -1,33 +1,30 @@
 #!/usr/bin/env python3
-"""Resume a SwiftAgent Claude session and print its event stream."""
+"""Resume a SwiftAgent native session through its original agent."""
 
 from __future__ import annotations
 
+import argparse
 import asyncio
 import json
 import os
-import sys
 
 from websockets.asyncio.client import connect
 
 
 async def main() -> int:
-    if len(sys.argv) < 3:
-        print("Usage: python3 resume_session.py <session-id> <prompt>", file=sys.stderr)
-        return 2
-
-    session_id = sys.argv[1].strip()
-    prompt = " ".join(sys.argv[2:]).strip()
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--agent", help="source agent id when no local source run is available")
+    parser.add_argument("session_id")
+    parser.add_argument("prompt", nargs="+")
+    arguments = parser.parse_args()
+    session_id = arguments.session_id.strip()
+    prompt = " ".join(arguments.prompt).strip()
     url = os.environ.get("SWIFTAGENT_WS_URL", "ws://127.0.0.1:8000/ws")
     async with connect(url) as websocket:
-        await websocket.send(
-            json.dumps(
-                {
-                    "type": "session:resume",
-                    "payload": {"session_id": session_id, "prompt": prompt},
-                }
-            )
-        )
+        payload = {"session_id": session_id, "prompt": prompt}
+        if arguments.agent:
+            payload["agent_id"] = arguments.agent
+        await websocket.send(json.dumps({"type": "session:resume", "payload": payload}))
         task_id: str | None = None
         async for raw_event in websocket:
             event = json.loads(raw_event)

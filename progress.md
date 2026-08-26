@@ -1,7 +1,10 @@
-# SwiftAgent Progress (Claude-Only)
+# Historical SwiftAgent progress snapshot (pre-v0.3)
 
 > Last updated: 2026-03-02  
-> Status: Core Claude migration implemented; connectors/workflows deferred.
+> Historical note only: this file describes the original Claude-only phase.
+> The current agent-agnostic implementation and validation status live in
+> [README.md](README.md), [ROADMAP.md](ROADMAP.md), and
+> [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md).
 
 ## Completed in this milestone
 

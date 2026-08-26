@@ -489,6 +489,8 @@ session IDs. The source session remains intact.
 
 ### 2.3 Create a three-agent reproducible demo
 
+**Status: completed, validated, and pushed.**
+
 Add a fictional `demo-workspace/` and one safe task that can be run with Claude
 Code, Codex, or OpenCode. The README and project site should show:
 

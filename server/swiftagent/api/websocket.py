@@ -188,6 +188,10 @@ async def _handle_client_event(
         # but we can also support it over WS for convenience
         from swiftagent.engine.manager import task_manager
 
+        if "agent_id" not in payload:
+            from swiftagent.storage import settings as settings_repo
+
+            payload = {**payload, "agent_id": settings_repo.get_default_agent_id()}
         config = TaskConfig(**payload)
         task = await task_manager.start_task(config, manager)
         await manager.send(
@@ -221,9 +225,9 @@ async def _handle_client_event(
 
         session_id = payload.get("session_id", "")
         prompt = payload.get("prompt", "")
-        agent_id = payload.get("agent_id", "claude-code")
-        if not isinstance(agent_id, str):
-            raise ValueError("agent_id must be a string")
+        agent_id = payload.get("agent_id")
+        if agent_id is not None and not isinstance(agent_id, str):
+            raise ValueError("agent_id must be a string when provided")
         task = await task_manager.resume_session(
             session_id,
             prompt,

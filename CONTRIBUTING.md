@@ -9,7 +9,7 @@ make setup
 make dev
 ```
 
-Python lives in `server/`; the React app lives in `client/`. The application entry point initializes SQLite and mounts REST/WebSocket routes. Claude process lifecycle and queueing live in `server/swiftagent/engine/`; workspace containment is in `server/swiftagent/tools/`.
+Python lives in `server/`; the React app lives in `client/`. The application entry point initializes SQLite and mounts REST/WebSocket routes. Agent adapters live in `server/swiftagent/agents/`, shared lifecycle and queueing live in `server/swiftagent/engine/`, and workspace containment is in `server/swiftagent/tools/`.
 
 ## Development workflow
 
@@ -18,6 +18,10 @@ Python lives in `server/`; the React app lives in `client/`. The application ent
 3. Run `make lint` and `make test`.
 4. For UI work, check keyboard operation, narrow screens, dark mode, empty/loading/error states, and the Settings safety status.
 5. Update documentation when behavior, configuration, or safety implications change.
+
+For the public multi-agent workflow fixture, run `make demo-verify`. It must stay
+dependency-free, contain no credentials, and preserve the same acceptance task
+for Claude Code, Codex, and OpenCode.
 
 `strict` must fail closed when bwrap is unavailable. Do not reintroduce automatic unsandboxed fallback or widen workspace paths without a security review.
 

@@ -71,3 +71,4 @@ Thumbs.db
 # Local SwiftAgent data and frontend artifacts
 .swiftagent/
 client/dist/
+demo-workspace/runs/

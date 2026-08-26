@@ -4,6 +4,9 @@ All notable changes are documented here. This project follows semantic versionin
 
 ## Unreleased
 
+- Add durable Local Run Receipts with normalized/native event evidence, separate safety layers, Git impact, explicit verification status, and JSON/Markdown export.
+- Add expiring single-use cross-agent handoff previews with user-selected context, visible redaction reports, source/target links, and no native session transfer.
+- Add the dependency-free Northstar three-agent demo fixture, isolated Git workspace preparation, deterministic verification, a real protocol-fixture screenshot/GIF, and an agent-neutral project site.
 - Publish a CI-checked v0.4 compatibility matrix using only verified, partial, unsupported, and unknown evidence levels.
 - Add one shared harmless acceptance task across Claude Code, Codex, and OpenCode fixtures, plus a Claude cancellation race regression.
 - Add a text-only generic-command adapter with a reviewed schema-v1 manifest, literal argv/stdin transport, environment allowlist, bounded output/timeout, process-group cleanup, and no shell interpolation.

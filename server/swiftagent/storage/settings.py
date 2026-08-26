@@ -75,7 +75,8 @@ def set_theme(theme: str) -> None:
 
 
 def get_default_agent_id() -> str:
-    return _get("default_agent_id", "claude-code").strip() or "claude-code"
+    environment_default = os.environ.get("SWIFTAGENT_DEFAULT_AGENT_ID", "claude-code")
+    return _get("default_agent_id", environment_default).strip() or "claude-code"
 
 
 def set_default_agent_id(agent_id: str) -> None:

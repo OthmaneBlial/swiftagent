@@ -2,18 +2,20 @@
 
 ## Why this file exists
 
-SwiftAgent currently supports two runtime safety modes:
+SwiftAgent supports two process-isolation modes for every adapter:
 
-- `strict`: Claude runs inside `bwrap` (OS sandbox)
-- `fallback`: Claude runs without OS isolation after an explicit user choice
+- `strict`: the selected local agent runs inside `bwrap` (OS sandbox)
+- `fallback`: the selected agent runs without OS isolation after an explicit user choice
 
-Right now, this machine reports:
+When a host reports:
 
 - `bwrap_available = true`
 - `bwrap_usable = false`
 - reason: `bwrap: setting up uid map: Permission denied`
 
-So `strict` tasks will now **fail before launch** rather than silently falling back. This is intentional: the Files API's workspace guard cannot isolate an unsandboxed Claude process.
+`strict` tasks **fail before launch** rather than silently falling back. This
+is intentional: the Files API's workspace guard cannot isolate an unsandboxed
+agent process.
 
 ---
 
@@ -26,7 +28,7 @@ So `strict` tasks will now **fail before launch** rather than silently falling b
 - `"degraded": false`
 - `"bwrap_usable": true`
 
-When this is true, Claude task execution is OS-isolated by `bwrap`.
+When this is true, adapter task execution is OS-isolated by `bwrap`.
 
 ---
 
@@ -43,17 +45,15 @@ sysctl user.max_user_namespaces 2>/dev/null || true
 Manual probe (same pattern SwiftAgent uses):
 
 ```bash
-workspace="$HOME/.swiftagent/workspace"
-mkdir -p "$workspace" "$HOME/.claude"
+workspace="/path/to/a/dedicated/swiftagent-workspace"
+mkdir -p "$workspace"
 bwrap --die-with-parent \
   --ro-bind / / \
   --dev-bind /dev /dev \
   --proc /proc \
   --tmpfs /tmp \
   --bind "$workspace" "$workspace" \
-  --bind "$HOME/.claude" "$HOME/.claude" \
   --chdir "$workspace" \
-  --setenv HOME "$HOME" \
   /bin/true
 echo $?
 ```
@@ -95,7 +95,7 @@ Fix must be applied at the container/host policy layer, not only inside SwiftAge
 1. Restart app:
 
 ```bash
-cd /home/othmane/APP-DIVERS-PROJECTS/swiftagent
+cd /path/to/swiftagent
 make dev
 ```
 
@@ -111,7 +111,8 @@ curl -s http://127.0.0.1:8000/api/engine/status?probe_auth=false
 - `strict_sandbox_active: true`
 - `degraded: false`
 
-4. Run a normal task and make sure no sandbox failure appears in server logs.
+4. Run one harmless task with an installed adapter and confirm that its receipt
+   reports SwiftAgent strict isolation separately from native safety controls.
 
 ---
 

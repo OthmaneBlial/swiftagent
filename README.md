@@ -8,6 +8,11 @@ SwiftAgent gives developers one calm interface for local coding agents: choose a
 
 **[Visit the live project site →](https://othmaneblial.github.io/swiftagent/)**
 
+![SwiftAgent Local Run Receipt for a completed, local protocol-fixture run](docs/images/swiftagent-run-receipt.png)
+
+_A real local protocol-fixture run: agent identity, native session, intent,
+result, and separate safety layers. No provider/model call._
+
 ## Why SwiftAgent
 
 Point SwiftAgent at a project folder, choose an available agent, and describe the outcome. Responses, tool calls, safety state, and final results stay in one local timeline. When an adapter proves native resume support, a later follow-up can continue that session instead of starting from zero.
@@ -36,6 +41,8 @@ make start
 - Selects adapters through a stable agent registry and exposes only declared capabilities.
 - Normalizes native streams into versioned message, tool, approval, question, plan, usage, and terminal events.
 - Stores task history, agent/adapter identity, capability snapshots, messages, results, and native session IDs in local SQLite.
+- Persists a Local Run Receipt with a normalized activity ledger, native event details, Git impact, safety layers, and explicit verification evidence.
+- Creates a new, redacted run for deliberate cross-agent handoff without transferring native session IDs or hidden reasoning.
 - Browses, creates, moves, and deletes UTF-8 files only inside the configured workspace.
 - Enforces bounded prompts, history pages, directory listings, and file reads/writes.
 - Queues up to 25 tasks after five active executions; queued work starts automatically as a slot frees.
@@ -88,6 +95,24 @@ python3 examples/advanced/resume_session.py <session-id> "Now propose the smalle
 
 They connect to a running local server and print the task event stream.
 
+## Reproducible multi-agent demo
+
+The fictional Northstar fixture gives Claude Code, Codex, and OpenCode the same
+dependency-free task in separate clean Git repositories:
+
+```bash
+make demo-verify   # failing baseline + passing reference, no agent call
+make demo-prepare  # isolated workspaces for all three agents
+```
+
+Then paste the prepared `TASK.md` into SwiftAgent and choose the matching agent.
+The published walkthrough uses deterministic local protocol fixtures; it is
+evidence of the workflow, not a model-quality benchmark.
+
+![Short redacted walkthrough of agent switching, capability cards, and a unified run ledger](docs/images/swiftagent-three-agent-demo.gif)
+
+Full procedure and capture boundaries: [reproducible demo](docs/DEMO.md).
+
 ## API
 
 The browser communicates with a local REST and WebSocket API. Useful operational endpoints include:
@@ -97,6 +122,8 @@ The browser communicates with a local REST and WebSocket API. Useful operational
 - `GET /api/agents` — detected integrations, versions, readiness, and capabilities
 - `GET /api/engine/status` — deprecated Claude compatibility and sandbox diagnosis
 - `GET /api/tasks?limit=50&offset=0` — bounded task history
+- `GET /api/tasks/{id}/receipt` — durable Local Run Receipt
+- `POST /api/tasks/{id}/handoff/preview` — bounded redacted handoff preview
 - `GET /api/files/list?path=.&limit=200` — bounded workspace directory listing
 - `ws://127.0.0.1:8000/ws` — `task:start`, `task:cancel`, and `session:resume`
 
@@ -114,7 +141,7 @@ FastAPI ── Task manager ── Agent registry ── selected local adapter
    └── SQLite history/settings and workspace-scoped file API
 ```
 
-More detail: [architecture](docs/ARCHITECTURE.md) · [compatibility matrix](docs/COMPATIBILITY.md) · [Local Run Receipts](docs/RUN_RECEIPTS.md) · [cross-agent handoffs](docs/HANDOFFS.md) · [ACP adapter](docs/ACP_ADAPTER.md) · [Codex adapter](docs/CODEX_ADAPTER.md) · [OpenCode adapter](docs/OPENCODE_ADAPTER.md) · [generic command adapter](docs/GENERIC_COMMAND_ADAPTER.md) · [demo capture guide](docs/DEMO.md).
+More detail: [architecture](docs/ARCHITECTURE.md) · [compatibility matrix](docs/COMPATIBILITY.md) · [Local Run Receipts](docs/RUN_RECEIPTS.md) · [cross-agent handoffs](docs/HANDOFFS.md) · [ACP adapter](docs/ACP_ADAPTER.md) · [Codex adapter](docs/CODEX_ADAPTER.md) · [OpenCode adapter](docs/OPENCODE_ADAPTER.md) · [generic command adapter](docs/GENERIC_COMMAND_ADAPTER.md) · [reproducible demo](docs/DEMO.md).
 
 ## Quality checks
 
@@ -128,7 +155,7 @@ The server regression suite covers adapter contracts, capability combinations, l
 
 ## Adapter availability
 
-The v0.3 release ships the migrated Claude Code adapter and the agent-neutral extension boundary. The in-development v0.4 line now includes tested local ACP v1, native Codex app-server, ACP-first OpenCode, and restricted generic-command adapters. Inspect their readiness, discovered models, transport, and effective capabilities in **Your agents**; the generic adapter remains disabled until its disposable test passes.
+The current main line includes tested local Claude Code stream-json, ACP v1, native Codex app-server, ACP-first OpenCode, and restricted generic-command adapters. Inspect their readiness, discovered models, transport, and effective capabilities in **Your agents**; the generic adapter remains disabled until its disposable test passes. Published verification applies to the pinned contracts in the [compatibility matrix](docs/COMPATIBILITY.md), not every future CLI/model/OS combination.
 
 ## Contributing and release notes
 

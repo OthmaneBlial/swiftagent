@@ -1,4 +1,4 @@
-.PHONY: dev dev-server dev-client install install-server install-client setup start build lint lint-server lint-client test test-server test-client clean onboard onboard-show
+.PHONY: dev dev-server dev-client install install-server install-client setup start build lint lint-server lint-client test test-server test-client clean onboard onboard-show demo-verify demo-prepare
 
 PYTHON := server/.venv/bin/python
 
@@ -24,11 +24,18 @@ install-client: ## Install Node dependencies
 setup: install ## Install every development dependency
 
 # ─── Onboard ────────────────────────────────────────────
-onboard: ## Interactive Claude setup wizard
+onboard: ## Interactive local-agent setup wizard
 	cd server && .venv/bin/python -m swiftagent.cli onboard
 
-onboard-show: ## Show current Claude readiness status
+onboard-show: ## Show free local agent detection
 	cd server && .venv/bin/python -m swiftagent.cli onboard --show
+
+# ─── Reproducible demo ──────────────────────────────────
+demo-verify: ## Verify the deterministic demo fixture without calling an agent
+	$(PYTHON) scripts/demo_workspace.py verify
+
+demo-prepare: ## Reset demo workspaces for Claude Code, Codex, and OpenCode
+	$(PYTHON) scripts/demo_workspace.py prepare-all
 
 # ─── Production ─────────────────────────────────────────
 start: ## Start in production mode

@@ -182,18 +182,21 @@ class TaskManager:
         prompt: str,
         manager: ConnectionManager,
         *,
-        agent_id: str = "claude-code",
+        agent_id: str | None = None,
     ) -> Task:
         normalized_session_id = session_id.strip()
         if not normalized_session_id:
             raise ValueError("Session id is required to resume a task")
         source = task_repo.get_latest_task_by_native_session_id(normalized_session_id)
-        if source is not None and source.agent_id != agent_id:
+        selected_agent_id = source.agent_id if source is not None and agent_id is None else agent_id
+        if selected_agent_id is None:
+            raise ValueError("agent_id is required when the source native session is unavailable")
+        if source is not None and source.agent_id != selected_agent_id:
             raise ValueError("Native sessions can only be resumed through their original agent")
         return await self._create_task(
             TaskConfig(
                 prompt=prompt,
-                agent_id=agent_id,
+                agent_id=selected_agent_id,
                 working_directory=source.config.working_directory if source else None,
                 model_id=source.config.model_id if source else None,
             ),

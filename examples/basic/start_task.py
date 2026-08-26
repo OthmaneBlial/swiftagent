@@ -3,23 +3,27 @@
 
 from __future__ import annotations
 
+import argparse
 import asyncio
 import json
 import os
-import sys
 
 from websockets.asyncio.client import connect
 
 
 async def main() -> int:
-    prompt = " ".join(sys.argv[1:]).strip()
-    if not prompt:
-        print("Usage: python3 start_task.py <prompt>", file=sys.stderr)
-        return 2
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--agent", help="agent id; otherwise use SwiftAgent's saved default")
+    parser.add_argument("prompt", nargs="+")
+    arguments = parser.parse_args()
+    prompt = " ".join(arguments.prompt).strip()
 
     url = os.environ.get("SWIFTAGENT_WS_URL", "ws://127.0.0.1:8000/ws")
     async with connect(url) as websocket:
-        await websocket.send(json.dumps({"type": "task:start", "payload": {"prompt": prompt}}))
+        payload = {"prompt": prompt}
+        if arguments.agent:
+            payload["agent_id"] = arguments.agent
+        await websocket.send(json.dumps({"type": "task:start", "payload": payload}))
         task_id: str | None = None
         async for raw_event in websocket:
             event = json.loads(raw_event)

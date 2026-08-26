@@ -536,7 +536,10 @@ async def files_delete(body: FileDeleteBody):
 def _providers_removed() -> None:
     raise HTTPException(
         status_code=410,
-        detail="Provider/key APIs were removed in Claude-only mode. Use /settings and /engine/status.",
+        detail=(
+            "Legacy provider/key APIs were removed. Authentication is owned by each local agent; "
+            "use /settings and /agents."
+        ),
     )
 
 

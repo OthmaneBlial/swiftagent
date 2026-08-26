@@ -4,7 +4,9 @@
 
 SwiftAgent gives developers a calmer way to delegate work to the Claude CLI: start a task, watch live tool activity, inspect the workspace, and keep durable local history. It is designed for one developer and one trusted machine—not a hosted multi-user agent platform.
 
-![Local-first](https://img.shields.io/badge/privacy-local--first-176B87) ![Python](https://img.shields.io/badge/backend-FastAPI-009688) ![React](https://img.shields.io/badge/frontend-React-149ECA) ![License](https://img.shields.io/badge/license-MIT-2F855A)
+![Local-first](https://img.shields.io/badge/privacy-local--first-176B87) ![Python](https://img.shields.io/badge/backend-FastAPI-009688) ![React](https://img.shields.io/badge/frontend-React-149ECA) ![License](https://img.shields.io/badge/license-MIT-2F855A) [![CI](https://github.com/OthmaneBlial/swiftagent/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/OthmaneBlial/swiftagent/actions/workflows/ci.yml)
+
+**[Visit the live project site →](https://othmaneblial.github.io/swiftagent/)**
 
 ## Why SwiftAgent
 
@@ -15,7 +17,7 @@ Point SwiftAgent at a project folder, describe a task, and immediately see Claud
 Prerequisites: Python 3.11+, Node.js 18+, and an installed, authenticated Claude Code CLI.
 
 ```bash
-git clone <your-fork-or-clone-url> swiftagent
+git clone https://github.com/OthmaneBlial/swiftagent.git
 cd swiftagent
 make setup
 make onboard

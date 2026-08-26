@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import sqlite3
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from pydantic import ValidationError
@@ -54,7 +55,21 @@ class ConnectionManager:
             self._connections.remove(ws)
 
     async def broadcast_agent_event(self, event: AgentEvent) -> None:
-        """Broadcast the versioned agent-neutral event envelope."""
+        """Persist, then broadcast, the versioned agent-neutral event envelope."""
+        from swiftagent.storage import receipts as receipt_repo
+        from swiftagent.storage.database import is_initialized
+
+        if is_initialized():
+            try:
+                receipt_repo.add_agent_event(event)
+            except sqlite3.Error:
+                # A storage failure must not break the adapter process or other
+                # live tasks. The server log still makes the evidence gap clear.
+                logger.exception(
+                    "agent_event_persistence_failed task_id=%s event_type=%s",
+                    event.run_id,
+                    event.type.value,
+                )
         data = event.model_dump_json()
         dead: list[WebSocket] = []
         for ws in self._connections:

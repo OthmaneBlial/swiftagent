@@ -74,6 +74,14 @@ class ClaudeCodeAdapter:
         )
         env = self._build_env()
         command, sandbox_notice = self._build_command(claude_path, workspace)
+        self.task.capability_snapshot.update(
+            {
+                "effective_model": self.task.config.model_id or claude_settings.get_model(),
+                "native_permission_mode": claude_settings.get_permission_mode(),
+                "swiftagent_isolation_notice": sandbox_notice,
+            }
+        )
+        task_repo.update_task_capability_snapshot(self.task.id, self.task.capability_snapshot)
 
         await self.manager.broadcast(
             WSEvent(

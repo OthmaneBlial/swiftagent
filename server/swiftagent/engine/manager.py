@@ -6,14 +6,16 @@ import asyncio
 import os
 from collections import deque
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from swiftagent.agents.base import AgentAdapter
 from swiftagent.agents.registry import AgentRegistry, agent_registry
 from swiftagent.models.task import Task, TaskConfig, TaskMessage, TaskStatus
+from swiftagent.storage import receipts as receipt_repo
 from swiftagent.storage import settings as settings_repo
 from swiftagent.storage import tasks as task_repo
-from swiftagent.tools.workspace import WorkspacePathError, resolve_workspace_path
+from swiftagent.tools.workspace import WorkspacePathError, get_workspace_dir, resolve_workspace_path
 
 if TYPE_CHECKING:
     from swiftagent.api.websocket import ConnectionManager
@@ -52,6 +54,7 @@ class TaskManager:
             native_session_id=session_id,
             capability_snapshot={
                 **definition.capabilities.model_dump(),
+                "protocol": definition.protocol,
                 "effective_sandbox_mode": settings_repo.get_sandbox_mode(),
             },
             session_id=session_id,
@@ -66,6 +69,11 @@ class TaskManager:
 
         task_repo.save_task(task)
         task_repo.add_task_message(task.id, user_msg)
+        workspace = (
+            Path(config.working_directory) if config.working_directory else get_workspace_dir()
+        )
+        baseline = await asyncio.to_thread(receipt_repo.capture_git_state, workspace)
+        receipt_repo.initialize_receipt(task, workspace, baseline)
 
         should_start = False
 
@@ -114,6 +122,7 @@ class TaskManager:
             await adapter.fail(str(e))
         finally:
             adapter.dispose()
+            await self._finalize_receipt(task_id)
             async with self._lock:
                 self._active.pop(task_id, None)
             await self._start_next()
@@ -148,6 +157,7 @@ class TaskManager:
 
         if queued_adapter:
             await queued_adapter.cancel()
+            await self._finalize_receipt(task_id)
             return
 
         task = task_repo.get_task(task_id)
@@ -156,6 +166,15 @@ class TaskManager:
         if task.status in {TaskStatus.COMPLETED, TaskStatus.FAILED, TaskStatus.CANCELLED}:
             raise ValueError(f"Task is already {task.status.value}")
         task_repo.update_task_status(task_id, TaskStatus.CANCELLED, datetime.now(UTC))
+        await self._finalize_receipt(task_id)
+
+    @staticmethod
+    async def _finalize_receipt(task_id: str) -> None:
+        workspace = receipt_repo.get_pending_receipt_workspace(task_id)
+        if workspace is None:
+            return
+        final_state = await asyncio.to_thread(receipt_repo.capture_git_state, workspace)
+        receipt_repo.finalize_receipt(task_id, final_state)
 
     async def resume_session(
         self,
@@ -168,8 +187,16 @@ class TaskManager:
         normalized_session_id = session_id.strip()
         if not normalized_session_id:
             raise ValueError("Session id is required to resume a task")
+        source = task_repo.get_latest_task_by_native_session_id(normalized_session_id)
+        if source is not None and source.agent_id != agent_id:
+            raise ValueError("Native sessions can only be resumed through their original agent")
         return await self._create_task(
-            TaskConfig(prompt=prompt, agent_id=agent_id),
+            TaskConfig(
+                prompt=prompt,
+                agent_id=agent_id,
+                working_directory=source.config.working_directory if source else None,
+                model_id=source.config.model_id if source else None,
+            ),
             manager,
             session_id=normalized_session_id,
         )

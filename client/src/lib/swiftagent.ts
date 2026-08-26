@@ -46,6 +46,90 @@ export interface TaskResult {
     error?: string;
 }
 
+export type VerificationStatus = 'passed' | 'failed' | 'not_run';
+
+export interface VerificationEvidence {
+    status: VerificationStatus;
+    summary: string | null;
+    command: string | null;
+    source: 'user' | 'adapter' | 'system';
+    recorded_at: string;
+}
+
+export interface SafetyLayer {
+    supported: boolean | null;
+    mode: string | null;
+    permission_policy: string | null;
+    active: boolean | null;
+    evidence_status: 'verified' | 'partial' | 'unsupported' | 'unknown';
+    notice: string | null;
+}
+
+export interface ActivityLedgerEntry {
+    sequence: number;
+    type: string;
+    timestamp: string;
+    summary: string;
+    payload: Record<string, unknown>;
+    native_event_type: string | null;
+    native_metadata: Record<string, unknown>;
+}
+
+export interface RunReceipt {
+    schema_version: 1;
+    run_id: string;
+    intent: string;
+    status: string;
+    agent: {
+        agent_id: string;
+        display_name: string;
+        adapter_id: string;
+        adapter_version: string;
+        protocol: string;
+        model: string | null;
+        native_session_id: string | null;
+    };
+    workspace: string;
+    started_at: string;
+    completed_at: string | null;
+    duration_ms: number | null;
+    result: TaskResult | null;
+    safety: {
+        native: SafetyLayer;
+        swiftagent_isolation: SafetyLayer;
+        effective_summary: string;
+    };
+    interactions: {
+        tools_started: number;
+        tools_completed: number;
+        approvals_requested: number;
+        approvals_approved: number;
+        approvals_denied: number;
+        questions_requested: number;
+        latest_plan: Record<string, unknown> | null;
+        latest_usage: Record<string, unknown> | null;
+    };
+    git: {
+        available: boolean;
+        baseline_sha: string | null;
+        final_sha: string | null;
+        branch: string | null;
+        initial_dirty: boolean;
+        initial_changed_files: string[];
+        changed_files: string[];
+        post_run_diff_summary: string | null;
+        error: string | null;
+    };
+    verification: VerificationEvidence;
+    ledger: ActivityLedgerEntry[];
+    ledger_total: number;
+    actions: {
+        inspect: boolean;
+        resume_same_agent: boolean;
+        create_handoff: boolean;
+    };
+}
+
 export interface AppSettings {
     debug_mode: boolean;
     theme: 'light' | 'dark' | 'system';
@@ -163,6 +247,7 @@ export interface WSEvent {
     type: string;
     payload: Record<string, unknown>;
     task_id?: string;
+    run_id?: string;
     timestamp: string;
 }
 
@@ -215,6 +300,32 @@ export const api = {
 
     listTasks: () => apiFetch<Task[]>('/tasks'),
     getTask: (id: string) => apiFetch<Task>(`/tasks/${id}`),
+    getRunReceipt: (id: string) => apiFetch<RunReceipt>(`/tasks/${id}/receipt`),
+    updateRunVerification: (
+        id: string,
+        update: { status: VerificationStatus; summary?: string; command?: string },
+    ) =>
+        apiFetch<RunReceipt>(`/tasks/${id}/receipt/verification`, {
+            method: 'PUT',
+            body: JSON.stringify(update),
+        }),
+    downloadRunReceipt: async (id: string, format: 'json' | 'markdown') => {
+        const response = await fetch(
+            `${API_BASE}/api/tasks/${encodeURIComponent(id)}/receipt/export?format=${format}`,
+        );
+        if (!response.ok) {
+            throw new Error(`Receipt export failed (${response.status})`);
+        }
+        const blob = await response.blob();
+        const objectUrl = URL.createObjectURL(blob);
+        const anchor = document.createElement('a');
+        anchor.href = objectUrl;
+        anchor.download = `swiftagent-receipt-${id}.${format === 'markdown' ? 'md' : 'json'}`;
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        URL.revokeObjectURL(objectUrl);
+    },
     deleteTask: (id: string) => apiFetch<{ ok: boolean }>(`/tasks/${id}`, { method: 'DELETE' }),
     clearHistory: () => apiFetch<{ ok: boolean }>('/tasks', { method: 'DELETE' }),
 

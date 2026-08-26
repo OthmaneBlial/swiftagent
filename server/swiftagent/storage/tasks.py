@@ -34,6 +34,20 @@ def get_task(task_id: str) -> Task | None:
     return task
 
 
+def get_latest_task_by_native_session_id(session_id: str) -> Task | None:
+    db = get_database()
+    row = db.execute(
+        """
+        SELECT * FROM tasks
+        WHERE native_session_id = ? OR session_id = ?
+        ORDER BY created_at DESC
+        LIMIT 1
+        """,
+        (session_id, session_id),
+    ).fetchone()
+    return _row_to_task(row) if row else None
+
+
 def save_task(task: Task) -> None:
     db = get_database()
     db.execute(

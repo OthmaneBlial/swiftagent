@@ -453,6 +453,8 @@ Run Receipt without erasing native detail.
 
 ### 2.1 Ship the Local Run Receipt
 
+**Status: completed, validated, and pushed.**
+
 Persist and display:
 
 - intent, agent, adapter/protocol version, model when reported, workspace,

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import UTC, datetime
+from pathlib import Path
 
 import pytest
 
@@ -8,6 +10,7 @@ from swiftagent.agents.claude import ClaudeCodeAdapter
 from swiftagent.agents.registry import AgentRegistry
 from swiftagent.models.agent import AgentCapabilities, AgentDefinition
 from swiftagent.models.task import Task, TaskConfig, TaskResult, TaskStatus
+from swiftagent.storage import settings as settings_repo
 from swiftagent.storage import tasks as task_repo
 
 
@@ -107,4 +110,90 @@ def test_strict_sandbox_never_silently_downgrades(client, monkeypatch):
     monkeypatch.setattr(adapter_module.shutil, "which", lambda _: None)
 
     with pytest.raises(RuntimeError, match="Strict sandbox is unavailable"):
-        adapter._build_command("claude", __import__("pathlib").Path("/tmp"))
+        adapter._build_command("claude", Path("/tmp"))
+
+
+@pytest.mark.asyncio
+async def test_resume_keeps_original_agent_workspace_and_model(client):
+    from swiftagent.engine.manager import TaskManager
+
+    workspace = Path(settings_repo.get_workspace_dir()) / "resume-fixture"
+    workspace.mkdir(parents=True, exist_ok=True)
+    source = Task(
+        config=TaskConfig(
+            prompt="Original run",
+            agent_id="fixture-agent",
+            working_directory=str(workspace),
+            model_id="fixture-model",
+        ),
+        status=TaskStatus.COMPLETED,
+        agent_id="fixture-agent",
+        adapter_id="fixture-adapter",
+        adapter_version="1.0.0",
+        native_session_id="fixture-session",
+        session_id="fixture-session",
+        capability_snapshot={"session_resume": True},
+    )
+    task_repo.save_task(source)
+
+    done = asyncio.Event()
+
+    class ResumeAdapter:
+        def __init__(self, task, manager):
+            self.task = task
+            self.manager = manager
+            self.running = False
+            self.session_id = task.session_id
+
+        async def start(self):
+            self.running = True
+
+        async def wait(self):
+            self.running = False
+            self.task.status = TaskStatus.COMPLETED
+            self.task.completed_at = datetime.now(UTC)
+            self.task.result = TaskResult(success=True, summary="resumed")
+            task_repo.complete_task(self.task, self.task.result)
+            done.set()
+
+        async def fail(self, error):
+            raise AssertionError(error)
+
+        async def cancel(self):
+            return None
+
+        def dispose(self):
+            return None
+
+    registry = AgentRegistry()
+    registry.register(
+        AgentDefinition(
+            agent_id="fixture-agent",
+            display_name="Fixture agent",
+            adapter_id="fixture-adapter",
+            adapter_version="1.0.0",
+            protocol="fixture",
+            capabilities=AgentCapabilities(session_resume=True),
+        ),
+        ResumeAdapter,
+    )
+    task_manager = TaskManager(registry)
+    resumed = await task_manager.resume_session(
+        "fixture-session",
+        "Continue safely",
+        object(),
+        agent_id="fixture-agent",
+    )
+    await asyncio.wait_for(done.wait(), timeout=1)
+
+    assert resumed.config.working_directory == str(workspace)
+    assert resumed.config.model_id == "fixture-model"
+    assert resumed.agent_id == "fixture-agent"
+
+    with pytest.raises(ValueError, match="original agent"):
+        await task_manager.resume_session(
+            "fixture-session",
+            "Do not cross native formats",
+            object(),
+            agent_id="different-agent",
+        )

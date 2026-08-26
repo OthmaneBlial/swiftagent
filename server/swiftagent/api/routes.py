@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Query
+from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
 from swiftagent.agents.acp import settings as acp_settings
@@ -17,8 +18,10 @@ from swiftagent.agents.generic_command import settings as generic_command_settin
 from swiftagent.agents.generic_command.tester import run_disposable_test
 from swiftagent.agents.opencode import settings as opencode_settings
 from swiftagent.agents.registry import agent_registry
+from swiftagent.models.receipt import RunReceipt, VerificationEvidence
 from swiftagent.models.settings import AppSettings
 from swiftagent.models.task import Task
+from swiftagent.storage import receipts as receipt_repo
 from swiftagent.storage import settings as settings_repo
 from swiftagent.storage import tasks as task_repo
 from swiftagent.tools.workspace import (
@@ -49,6 +52,70 @@ async def get_task(task_id: str):
     if not task:
         raise HTTPException(404, "Task not found")
     return task
+
+
+@router.get("/tasks/{task_id}/receipt", response_model=RunReceipt)
+async def get_run_receipt(task_id: str):
+    receipt = receipt_repo.get_receipt(task_id)
+    if receipt is None:
+        raise HTTPException(404, "Run receipt not found")
+    return receipt
+
+
+class VerificationUpdate(BaseModel):
+    status: Literal["passed", "failed", "not_run"]
+    summary: str | None = Field(default=None, max_length=4_096)
+    command: str | None = Field(default=None, max_length=4_096)
+
+
+@router.put("/tasks/{task_id}/receipt/verification", response_model=RunReceipt)
+async def update_run_verification(task_id: str, update: VerificationUpdate):
+    if update.status != "not_run" and not (update.summary or "").strip():
+        raise HTTPException(400, "Verification evidence is required for passed or failed")
+    if task_repo.get_task(task_id) is None:
+        raise HTTPException(404, "Task not found")
+    summary = (update.summary or "").strip() or None if update.status != "not_run" else None
+    command = (update.command or "").strip() or None if update.status != "not_run" else None
+    evidence = VerificationEvidence(
+        status=update.status,
+        summary=summary,
+        command=command,
+        source="user",
+        recorded_at=datetime.now(UTC),
+    )
+    try:
+        receipt_repo.record_verification(task_id, evidence)
+    except ValueError as exc:
+        raise HTTPException(404, str(exc)) from exc
+    receipt = receipt_repo.get_receipt(task_id)
+    if receipt is None:  # pragma: no cover - guarded by persistence update
+        raise HTTPException(404, "Run receipt not found")
+    return receipt
+
+
+@router.get("/tasks/{task_id}/receipt/export")
+async def export_run_receipt(
+    task_id: str,
+    format: Literal["json", "markdown"] = Query(default="json"),
+):
+    receipt = receipt_repo.get_receipt(task_id)
+    if receipt is None:
+        raise HTTPException(404, "Run receipt not found")
+    if format == "markdown":
+        content = receipt_repo.receipt_as_markdown(receipt)
+        media_type = "text/markdown; charset=utf-8"
+        extension = "md"
+    else:
+        content = receipt.model_dump_json(indent=2)
+        media_type = "application/json"
+        extension = "json"
+    return Response(
+        content=content,
+        media_type=media_type,
+        headers={
+            "Content-Disposition": f'attachment; filename="swiftagent-receipt-{task_id}.{extension}"'
+        },
+    )
 
 
 @router.delete("/tasks/{task_id}")

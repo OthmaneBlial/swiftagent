@@ -17,7 +17,7 @@ from swiftagent.models.agent import (
 )
 from swiftagent.models.task import Task, TaskConfig, TaskResult, TaskStatus
 from swiftagent.storage import tasks as task_repo
-from swiftagent.storage.database import _migrate_v1, _migrate_v2, _migrate_v3
+from swiftagent.storage.database import _migrate_v1, _migrate_v2, _migrate_v3, _migrate_v4
 
 
 class NoopAdapter:
@@ -327,3 +327,45 @@ def test_v3_migration_marks_legacy_tasks_as_claude_without_losing_sessions():
     assert row["adapter_version"] == "0.3.0"
     assert row["native_session_id"] == "legacy-session"
     assert row["capability_snapshot_json"] == "{}"
+
+
+def test_v4_migration_adds_receipt_evidence_without_rewriting_legacy_tasks():
+    db = sqlite3.connect(":memory:")
+    db.row_factory = sqlite3.Row
+    _migrate_v1(db)
+    _migrate_v2(db)
+    _migrate_v3(db)
+    created_at = datetime.now(UTC).isoformat()
+    db.execute(
+        """
+        INSERT INTO tasks (
+            id, prompt, working_directory, status, session_id, summary,
+            result_json, config_json, created_at, completed_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            "legacy-receipt-task",
+            "Legacy run",
+            None,
+            "completed",
+            None,
+            "done",
+            None,
+            json.dumps({"prompt": "Legacy run"}),
+            created_at,
+            created_at,
+        ),
+    )
+    _migrate_v4(db)
+
+    tables = {
+        row["name"]
+        for row in db.execute("SELECT name FROM sqlite_master WHERE type = 'table'").fetchall()
+    }
+    assert {"tasks", "agent_events", "run_receipts"}.issubset(tables)
+    receipt = db.execute(
+        "SELECT * FROM run_receipts WHERE task_id = 'legacy-receipt-task'"
+    ).fetchone()
+    assert receipt is not None
+    assert "predates" in json.loads(receipt["git_baseline_json"])["error"]
+    assert json.loads(receipt["verification_json"])["status"] == "not_run"

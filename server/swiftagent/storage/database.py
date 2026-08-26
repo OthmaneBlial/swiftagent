@@ -7,14 +7,16 @@ Ported from base/accomplish/packages/agent-core/src/storage/database.ts
 
 from __future__ import annotations
 
+import json
 import sqlite3
 import threading
+from datetime import UTC, datetime
 
 _db: sqlite3.Connection | None = None
 _db_path: str | None = None
 _lock = threading.RLock()
 
-CURRENT_SCHEMA_VERSION = 3
+CURRENT_SCHEMA_VERSION = 4
 
 
 def init_database(db_path: str) -> sqlite3.Connection:
@@ -85,6 +87,8 @@ def _run_migrations(db: sqlite3.Connection) -> None:
         _migrate_v2(db)
     if current_version < 3:
         _migrate_v3(db)
+    if current_version < 4:
+        _migrate_v4(db)
 
     if current_version == 0:
         db.execute("INSERT INTO schema_version (version) VALUES (?)", (CURRENT_SCHEMA_VERSION,))
@@ -185,3 +189,82 @@ def _migrate_v3(db: sqlite3.Connection) -> None:
         "WHERE native_session_id IS NULL AND session_id IS NOT NULL"
     )
     db.execute("CREATE INDEX IF NOT EXISTS idx_tasks_agent_created_at ON tasks(agent_id, created_at DESC)")
+
+
+def _migrate_v4(db: sqlite3.Connection) -> None:
+    """Persist normalized agent events and durable Local Run Receipt evidence."""
+    db.execute(
+        """
+        CREATE TABLE IF NOT EXISTS agent_events (
+            sequence INTEGER PRIMARY KEY AUTOINCREMENT,
+            task_id TEXT NOT NULL,
+            event_type TEXT NOT NULL,
+            timestamp TEXT NOT NULL,
+            event_json TEXT NOT NULL,
+            FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
+        )
+        """
+    )
+    db.execute(
+        "CREATE INDEX IF NOT EXISTS idx_agent_events_task_sequence "
+        "ON agent_events(task_id, sequence)"
+    )
+    db.execute(
+        """
+        CREATE TABLE IF NOT EXISTS run_receipts (
+            task_id TEXT PRIMARY KEY,
+            workspace TEXT NOT NULL,
+            git_baseline_json TEXT NOT NULL,
+            git_final_json TEXT,
+            verification_json TEXT NOT NULL,
+            finalized_at TEXT,
+            FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
+        )
+        """
+    )
+    now = datetime.now(UTC).isoformat()
+    legacy_git = json.dumps(
+        {
+            "available": False,
+            "repo_root": None,
+            "head_sha": None,
+            "branch": None,
+            "dirty": False,
+            "changed_files": [],
+            "diff_summary": None,
+            "captured_at": now,
+            "error": "Legacy run predates Local Run Receipt Git capture.",
+            "fingerprints": {},
+        }
+    )
+    legacy_verification = json.dumps(
+        {
+            "status": "not_run",
+            "summary": None,
+            "command": None,
+            "source": "system",
+            "recorded_at": now,
+        }
+    )
+    # Older history remains inspectable, but missing evidence is explicit. It
+    # would be misleading to capture today's Git tree for a historical run.
+    for task in db.execute(
+        "SELECT id, working_directory FROM tasks "
+        "WHERE id NOT IN (SELECT task_id FROM run_receipts)"
+    ).fetchall():
+        db.execute(
+            """
+            INSERT INTO run_receipts (
+                task_id, workspace, git_baseline_json, git_final_json,
+                verification_json, finalized_at
+            ) VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                task["id"],
+                task["working_directory"] or "unknown (legacy run)",
+                legacy_git,
+                legacy_git,
+                legacy_verification,
+                now,
+            ),
+        )

@@ -13,7 +13,8 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import AgentBadge from '../components/agents/AgentBadge';
 import PermissionDialog, { type PermissionPayload } from '../components/execution/PermissionDialog';
-import { api, type Task, type TaskMessage, type WSEvent, ws } from '../lib/swiftagent';
+import RunReceiptPanel from '../components/execution/RunReceiptPanel';
+import { api, type RunReceipt, type Task, type TaskMessage, type WSEvent, ws } from '../lib/swiftagent';
 import { toast } from '../lib/toast';
 
 type TaskViewStatus =
@@ -73,11 +74,13 @@ export default function Execution() {
     const [sendingReply, setSendingReply] = useState(false);
     const [pendingRequest, setPendingRequest] = useState<PendingRequest | null>(null);
     const [agentName, setAgentName] = useState('Coding agent');
+    const [receipt, setReceipt] = useState<RunReceipt | null>(null);
 
     const eventKeysRef = useRef<Set<string>>(new Set());
     const scrollRef = useRef<HTMLDivElement>(null);
     const followUpSessionRef = useRef<string | null>(null);
     const followUpTimeoutRef = useRef<number | null>(null);
+    const replyTextareaRef = useRef<HTMLTextAreaElement>(null);
 
     useEffect(() => {
         if (!taskId) {
@@ -91,9 +94,10 @@ export default function Execution() {
             eventKeysRef.current.clear();
 
             try {
-                const [loadedTask, catalog] = await Promise.all([
+                const [loadedTask, catalog, loadedReceipt] = await Promise.all([
                     api.getTask(taskId),
                     api.listAgents().catch(() => null),
+                    api.getRunReceipt(taskId).catch(() => null),
                 ]);
                 if (cancelled) return;
                 if (!loadedTask) {
@@ -108,6 +112,7 @@ export default function Execution() {
                 setMessages(loadedTask.messages ?? []);
                 setStatus(loadedTask.status as TaskViewStatus);
                 setProgress(statusProgress(loadedTask.status));
+                setReceipt(loadedReceipt);
             } catch (error) {
                 if (cancelled) return;
                 setStatus('failed');
@@ -241,8 +246,20 @@ export default function Execution() {
                 if (payload.error && nextStatus !== 'cancelled') {
                     toast.error('Task failed', payload.error);
                 }
+                window.setTimeout(() => {
+                    if (taskId) {
+                        void api.getRunReceipt(taskId).then(setReceipt).catch(() => undefined);
+                    }
+                }, 150);
             })
         );
+
+        const refreshTerminalReceipt = (event: WSEvent) => {
+            if (!taskId || event.run_id !== taskId) return;
+            void api.getRunReceipt(taskId).then(setReceipt).catch(() => undefined);
+        };
+        unsubs.push(ws.on('run.completed', refreshTerminalReceipt));
+        unsubs.push(ws.on('run.failed', refreshTerminalReceipt));
 
         unsubs.push(
             ws.on('permission:request', (event) => {
@@ -365,6 +382,20 @@ export default function Execution() {
     ) && !isRunning && !sendingReply;
     const showTypingIndicator = isRunning && !pendingRequest && !loadingTask;
 
+    const focusResumeComposer = () => {
+        if (!canReply) {
+            toast.error('Resume unavailable', 'This run has no resumable native session.');
+            return;
+        }
+        replyTextareaRef.current?.focus();
+        replyTextareaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    };
+
+    const prepareHandoff = () => {
+        if (!taskId) return;
+        navigate(`/?handoff_from=${encodeURIComponent(taskId)}`);
+    };
+
     return (
         <div className="flex-1 flex flex-col h-screen">
             <header className="h-14 border-b border-border flex items-center px-4 gap-3 shrink-0">
@@ -469,11 +500,21 @@ export default function Execution() {
                         </div>
                     </motion.div>
                 ) : null}
+
+                {receipt ? (
+                    <RunReceiptPanel
+                        receipt={receipt}
+                        onReceiptChange={setReceipt}
+                        onResume={focusResumeComposer}
+                        onHandoff={prepareHandoff}
+                    />
+                ) : null}
             </div>
 
             <div className="border-t border-border px-4 py-3 shrink-0">
                 <div className="max-w-3xl mx-auto flex items-end gap-2">
                     <textarea
+                        ref={replyTextareaRef}
                         value={reply}
                         onChange={(event) => setReply(event.target.value)}
                         onKeyDown={(event) => {

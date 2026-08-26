@@ -2,9 +2,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from swiftagent.engine.adapter import ClaudeAdapter
-from swiftagent.engine.parser import MessageType, ParsedMessage, StreamParser
-from swiftagent.models.task import Task, TaskConfig
+import pytest
+
+from swiftagent.agents.claude import ClaudeCodeAdapter
+from swiftagent.agents.claude.parser import MessageType, ParsedMessage, StreamParser
+from swiftagent.models.agent import AgentEventType
+from swiftagent.models.task import Task, TaskConfig, TaskStatus
+from swiftagent.storage import tasks as task_repo
 
 FIXTURE_DIR = Path(__file__).parent / "fixtures" / "claude_stream"
 
@@ -65,16 +69,16 @@ def test_failed_stream_contract_is_terminal_and_resumable():
 
 
 def test_claude_argument_contract_for_new_and_resumed_runs(monkeypatch):
-    import swiftagent.engine.adapter as adapter_module
+    import swiftagent.agents.claude.settings as claude_settings
 
-    monkeypatch.setattr(adapter_module.settings_repo, "get_claude_model", lambda: "default-model")
+    monkeypatch.setattr(claude_settings, "get_model", lambda: "default-model")
     monkeypatch.setattr(
-        adapter_module.settings_repo,
-        "get_claude_permission_mode",
+        claude_settings,
+        "get_permission_mode",
         lambda: "plan",
     )
 
-    fresh = ClaudeAdapter(
+    fresh = ClaudeCodeAdapter(
         Task(config=TaskConfig(prompt="Inspect this repository", model_id="task-model")),
         manager=None,  # type: ignore[arg-type]
     )
@@ -90,7 +94,7 @@ def test_claude_argument_contract_for_new_and_resumed_runs(monkeypatch):
         "Inspect this repository",
     ]
 
-    resumed = ClaudeAdapter(
+    resumed = ClaudeCodeAdapter(
         Task(
             config=TaskConfig(prompt="Continue the review"),
             session_id="fixture-session-001",
@@ -113,16 +117,17 @@ def test_claude_argument_contract_for_new_and_resumed_runs(monkeypatch):
 
 
 def test_fallback_command_is_an_argument_array_with_an_explicit_warning(monkeypatch, tmp_path):
-    import swiftagent.engine.adapter as adapter_module
+    import swiftagent.agents.claude.settings as claude_settings
+    import swiftagent.storage.settings as app_settings
 
-    monkeypatch.setattr(adapter_module.settings_repo, "get_sandbox_mode", lambda: "fallback")
-    monkeypatch.setattr(adapter_module.settings_repo, "get_claude_model", lambda: None)
+    monkeypatch.setattr(app_settings, "get_sandbox_mode", lambda: "fallback")
+    monkeypatch.setattr(claude_settings, "get_model", lambda: None)
     monkeypatch.setattr(
-        adapter_module.settings_repo,
-        "get_claude_permission_mode",
+        claude_settings,
+        "get_permission_mode",
         lambda: "default",
     )
-    adapter = ClaudeAdapter(
+    adapter = ClaudeCodeAdapter(
         Task(config=TaskConfig(prompt="Read only")),
         manager=None,  # type: ignore[arg-type]
     )
@@ -135,20 +140,20 @@ def test_fallback_command_is_an_argument_array_with_an_explicit_warning(monkeypa
 
 
 def test_engine_status_contract_exposes_cli_and_strict_sandbox_state(client, monkeypatch):
-    import swiftagent.api.routes as routes_module
+    import swiftagent.agents.claude.status as status_module
 
-    monkeypatch.setattr(routes_module, "_resolve_claude_path", lambda: "/opt/tools/claude")
+    monkeypatch.setattr(status_module, "resolve_cli_path", lambda: "/opt/tools/claude")
     monkeypatch.setattr(
-        routes_module.shutil,
+        status_module.shutil,
         "which",
         lambda executable: "/usr/bin/bwrap" if executable == "bwrap" else None,
     )
     monkeypatch.setattr(
-        routes_module,
+        status_module,
         "check_bwrap_usable",
         lambda _workspace: (True, None),
     )
-    monkeypatch.setattr(routes_module.settings_repo, "get_sandbox_mode", lambda: "strict")
+    monkeypatch.setattr(status_module.settings_repo, "get_sandbox_mode", lambda: "strict")
 
     response = client.get("/api/engine/status")
 
@@ -160,3 +165,54 @@ def test_engine_status_contract_exposes_cli_and_strict_sandbox_state(client, mon
     assert payload["bwrap_usable"] is True
     assert payload["strict_sandbox_active"] is True
     assert payload["degraded"] is False
+
+
+@pytest.mark.asyncio
+async def test_claude_adapter_maps_native_messages_to_bounded_normalized_events(client):
+    class RecordingManager:
+        def __init__(self):
+            self.legacy = []
+            self.normalized = []
+
+        async def broadcast(self, event):
+            self.legacy.append(event)
+
+        async def broadcast_agent_event(self, event):
+            self.normalized.append(event)
+
+    task = Task(config=TaskConfig(prompt="Inspect this repository"), status=TaskStatus.RUNNING)
+    task_repo.save_task(task)
+    manager = RecordingManager()
+    adapter = ClaudeCodeAdapter(task, manager)  # type: ignore[arg-type]
+    messages = _parse_fixture("successful_run.jsonl")
+
+    for message in messages:
+        await adapter._handle_message_async(message)
+
+    event_types = [event.type for event in manager.normalized]
+    assert event_types == [
+        AgentEventType.MESSAGE_COMPLETED,
+        AgentEventType.TOOL_STARTED,
+        AgentEventType.TOOL_COMPLETED,
+        AgentEventType.MESSAGE_COMPLETED,
+        AgentEventType.RUN_COMPLETED,
+    ]
+    assert all(event.agent_id == "claude-code" for event in manager.normalized)
+    assert all(event.adapter_id == "claude-stream-json" for event in manager.normalized)
+    assert manager.normalized[-1].native_session_id == "fixture-session-001"
+    assert manager.normalized[1].native_metadata["type"] == "assistant"
+    assert task.status is TaskStatus.COMPLETED
+    assert task_repo.get_task(task.id).native_session_id == "fixture-session-001"  # type: ignore[union-attr]
+
+
+def test_native_diagnostics_are_bounded():
+    message = ParsedMessage(
+        type=MessageType.TEXT,
+        content="ok",
+        data={"raw": {"type": "assistant", "large": "x" * 20_000}},
+    )
+
+    metadata = ClaudeCodeAdapter._native_metadata(message, max_chars=100)
+
+    assert metadata["truncated"] is True
+    assert len(metadata["preview"]) == 100

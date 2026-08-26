@@ -26,6 +26,16 @@ def _set(key: str, value: str) -> None:
     db.commit()
 
 
+def get_value(key: str, default: str = "") -> str:
+    """Read an adapter-owned setting from the shared key-value store."""
+    return _get(key, default)
+
+
+def set_value(key: str, value: str) -> None:
+    """Persist an adapter-owned setting without teaching storage about its meaning."""
+    _set(key, value)
+
+
 def _default_workspace_dir() -> str:
     configured = os.environ.get("SWIFTAGENT_WORKSPACE_DIR", "").strip()
     if configured:

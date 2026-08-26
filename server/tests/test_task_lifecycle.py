@@ -4,8 +4,8 @@ import asyncio
 
 import pytest
 
+from swiftagent.agents.claude import ClaudeCodeAdapter
 from swiftagent.agents.registry import AgentRegistry
-from swiftagent.engine.adapter import ClaudeAdapter
 from swiftagent.models.agent import AgentCapabilities, AgentDefinition
 from swiftagent.models.task import Task, TaskConfig, TaskResult, TaskStatus
 from swiftagent.storage import tasks as task_repo
@@ -99,10 +99,11 @@ async def test_queued_task_starts_when_a_slot_becomes_available(client):
 
 
 def test_strict_sandbox_never_silently_downgrades(client, monkeypatch):
-    import swiftagent.engine.adapter as adapter_module
+    import swiftagent.agents.claude.adapter as adapter_module
+    import swiftagent.storage.settings as app_settings
 
-    adapter = ClaudeAdapter(Task(config=TaskConfig(prompt="safe task")), manager=None)  # type: ignore[arg-type]
-    monkeypatch.setattr(adapter_module.settings_repo, "get_sandbox_mode", lambda: "strict")
+    adapter = ClaudeCodeAdapter(Task(config=TaskConfig(prompt="safe task")), manager=None)  # type: ignore[arg-type]
+    monkeypatch.setattr(app_settings, "get_sandbox_mode", lambda: "strict")
     monkeypatch.setattr(adapter_module.shutil, "which", lambda _: None)
 
     with pytest.raises(RuntimeError, match="Strict sandbox is unavailable"):

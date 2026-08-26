@@ -42,9 +42,9 @@ class AgentRegistry:
 
 def _create_claude_adapter(task: Task, manager: Any) -> AgentAdapter:
     # Lazy import keeps the registry independent from concrete adapter modules.
-    from swiftagent.engine.adapter import ClaudeAdapter
+    from swiftagent.agents.claude import ClaudeCodeAdapter
 
-    return ClaudeAdapter(task, manager)
+    return ClaudeCodeAdapter(task, manager)
 
 
 agent_registry = AgentRegistry()

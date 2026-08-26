@@ -14,6 +14,7 @@ import logging
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from pydantic import ValidationError
 
+from swiftagent.models.agent import AgentEvent
 from swiftagent.models.events import WSEvent, WSEventType
 from swiftagent.models.task import TaskConfig
 
@@ -42,6 +43,18 @@ class ConnectionManager:
 
     async def broadcast(self, event: WSEvent) -> None:
         """Send an event to all connected clients."""
+        data = event.model_dump_json()
+        dead: list[WebSocket] = []
+        for ws in self._connections:
+            try:
+                await ws.send_text(data)
+            except Exception:
+                dead.append(ws)
+        for ws in dead:
+            self._connections.remove(ws)
+
+    async def broadcast_agent_event(self, event: AgentEvent) -> None:
+        """Broadcast the versioned agent-neutral event envelope."""
         data = event.model_dump_json()
         dead: list[WebSocket] = []
         for ws in self._connections:

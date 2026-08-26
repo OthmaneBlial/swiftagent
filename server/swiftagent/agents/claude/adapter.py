@@ -1,0 +1,552 @@
+"""Claude Code adapter — native process lifecycle and normalized events."""
+
+from __future__ import annotations
+
+import asyncio
+import logging
+import os
+import shutil
+import signal
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import TYPE_CHECKING
+
+from swiftagent.agents.claude import settings as claude_settings
+from swiftagent.agents.claude.parser import MessageType, ParsedMessage, StreamParser
+from swiftagent.agents.claude.state import get_state_dir
+from swiftagent.models.agent import AgentEvent, AgentEventType
+from swiftagent.models.events import WSEvent, WSEventType
+from swiftagent.models.task import Task, TaskMessage, TaskResult, TaskStatus
+from swiftagent.storage import tasks as task_repo
+from swiftagent.tools.sandbox import check_bwrap_usable
+from swiftagent.tools.workspace import get_workspace_dir
+
+if TYPE_CHECKING:
+    from swiftagent.api.websocket import ConnectionManager
+
+
+logger = logging.getLogger(__name__)
+
+
+class ClaudeCodeAdapter:
+    """Manages a Claude CLI subprocess for one task."""
+
+    def __init__(self, task: Task, manager: ConnectionManager):
+        self.task = task
+        self.manager = manager
+        self._process: asyncio.subprocess.Process | None = None
+        self._disposed = False
+
+        self._stdout_task: asyncio.Task | None = None
+        self._stderr_task: asyncio.Task | None = None
+        self._wait_task: asyncio.Task | None = None
+
+        self._session_id: str | None = task.native_session_id or task.session_id
+        self._parser = StreamParser(self._handle_message)
+
+        self._completion_lock = asyncio.Lock()
+        self._completed = False
+        self._saw_result = False
+
+    @property
+    def running(self) -> bool:
+        return (
+            self._process is not None and self._process.returncode is None and not self._completed
+        )
+
+    @property
+    def session_id(self) -> str | None:
+        return self._session_id
+
+    async def start(self) -> None:
+        if self._disposed:
+            raise RuntimeError("Adapter disposed")
+
+        claude_path = self._find_claude_cli()
+        if not claude_path:
+            raise RuntimeError("Claude CLI not found. Install Claude Code first.")
+
+        workspace = (
+            Path(self.task.config.working_directory)
+            if self.task.config.working_directory
+            else get_workspace_dir()
+        )
+        env = self._build_env()
+        command, sandbox_notice = self._build_command(claude_path, workspace)
+
+        await self.manager.broadcast(
+            WSEvent(
+                type=WSEventType.TASK_PROGRESS,
+                task_id=self.task.id,
+                payload={
+                    "stage": "starting",
+                    "message": "Spawning Claude...",
+                    "workspace": str(workspace),
+                },
+            )
+        )
+
+        if sandbox_notice:
+            logger.warning("sandbox_notice task_id=%s message=%s", self.task.id, sandbox_notice)
+            await self.manager.broadcast(
+                WSEvent(
+                    type=WSEventType.TASK_PROGRESS,
+                    task_id=self.task.id,
+                    payload={"stage": "sandbox", "message": sandbox_notice},
+                )
+            )
+
+        self._process = await asyncio.create_subprocess_exec(
+            *command,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            env=env,
+            cwd=str(workspace),
+            start_new_session=True,
+        )
+
+        self._stdout_task = asyncio.create_task(self._read_stdout())
+        self._stderr_task = asyncio.create_task(self._read_stderr())
+        self._wait_task = asyncio.create_task(self._wait_for_exit())
+        await self._emit_agent_event(
+            AgentEventType.RUN_STARTED,
+            {
+                "workspace": str(workspace),
+                "sandbox_notice": sandbox_notice,
+            },
+            native_event_type="process.started",
+        )
+
+    async def wait(self) -> None:
+        if self._wait_task:
+            await self._wait_task
+
+    async def fail(self, error: str) -> None:
+        await self._complete_task(success=False, error=error)
+
+    async def _wait_for_exit(self) -> None:
+        assert self._process is not None
+
+        returncode = await self._process.wait()
+
+        if self._stdout_task:
+            try:
+                await asyncio.wait_for(self._stdout_task, timeout=3)
+            except TimeoutError:
+                pass
+
+        if self._completed:
+            return
+
+        if self._saw_result:
+            # Give the result handler a short window to win the completion race.
+            for _ in range(20):
+                if self._completed:
+                    return
+                await asyncio.sleep(0.05)
+
+        if returncode != 0:
+            await self._complete_task(
+                success=False,
+                error=f"Claude process exited with code {returncode}",
+            )
+            return
+
+        await self._complete_task(
+            success=False,
+            error="Claude process exited before emitting a result event",
+        )
+
+    async def _read_stdout(self) -> None:
+        assert self._process is not None and self._process.stdout is not None
+        try:
+            async for line in self._process.stdout:
+                if self._disposed:
+                    break
+                self._parser.feed(line.decode("utf-8", errors="replace"))
+        finally:
+            self._parser.flush()
+
+    async def _read_stderr(self) -> None:
+        assert self._process is not None and self._process.stderr is not None
+        try:
+            async for line in self._process.stderr:
+                if self._disposed:
+                    break
+                text = line.decode("utf-8", errors="replace").strip()
+                if text:
+                    logger.warning("claude_stderr task_id=%s message=%s", self.task.id, text)
+        except Exception:
+            pass
+
+    def _handle_message(self, msg: ParsedMessage) -> None:
+        asyncio.create_task(self._handle_message_async(msg))
+
+    async def _handle_message_async(self, msg: ParsedMessage) -> None:
+        if msg.type == MessageType.SESSION_ID:
+            self._session_id = msg.content
+            self.task.native_session_id = msg.content
+            self.task.session_id = msg.content
+            task_repo.update_task_session_id(self.task.id, msg.content)
+            return
+
+        if msg.type == MessageType.TEXT:
+            task_msg = TaskMessage(role="assistant", content=msg.content)
+            task_repo.add_task_message(self.task.id, task_msg)
+            await self.manager.broadcast(
+                WSEvent(
+                    type=WSEventType.TASK_MESSAGE,
+                    task_id=self.task.id,
+                    payload={"role": "assistant", "content": msg.content},
+                )
+            )
+            await self._emit_agent_event(
+                AgentEventType.MESSAGE_COMPLETED,
+                {"role": "assistant", "content": msg.content},
+                native_event_type="assistant.text",
+                native_metadata=self._native_metadata(msg),
+            )
+            return
+
+        if msg.type == MessageType.TOOL_USE:
+            tool_name = msg.data.get("name") or msg.content
+            tool_input = msg.data.get("input") or {}
+            tool_use_id = msg.data.get("tool_use_id")
+
+            task_repo.add_task_message(
+                self.task.id,
+                TaskMessage(
+                    role="tool",
+                    content=f"Using tool: {tool_name}",
+                    metadata={
+                        "kind": "tool_use",
+                        "tool_use_id": tool_use_id,
+                        "name": tool_name,
+                        "input": tool_input,
+                    },
+                ),
+            )
+            await self.manager.broadcast(
+                WSEvent(
+                    type=WSEventType.TOOL_USE,
+                    task_id=self.task.id,
+                    payload={
+                        "name": tool_name,
+                        "input": tool_input,
+                        "tool_use_id": tool_use_id,
+                    },
+                )
+            )
+            await self._emit_agent_event(
+                AgentEventType.TOOL_STARTED,
+                {
+                    "name": tool_name,
+                    "input": tool_input,
+                    "tool_call_id": tool_use_id,
+                },
+                native_event_type="assistant.tool_use",
+                native_metadata=self._native_metadata(msg),
+            )
+            return
+
+        if msg.type == MessageType.TOOL_RESULT:
+            tool_use_id = msg.data.get("tool_use_id")
+            is_error = bool(msg.data.get("is_error"))
+
+            task_repo.add_task_message(
+                self.task.id,
+                TaskMessage(
+                    role="tool",
+                    content=msg.content,
+                    metadata={
+                        "kind": "tool_result",
+                        "tool_use_id": tool_use_id,
+                        "is_error": is_error,
+                    },
+                ),
+            )
+            await self.manager.broadcast(
+                WSEvent(
+                    type=WSEventType.TOOL_RESULT,
+                    task_id=self.task.id,
+                    payload={
+                        "content": msg.content,
+                        "tool_use_id": tool_use_id,
+                        "is_error": is_error,
+                    },
+                )
+            )
+            await self._emit_agent_event(
+                AgentEventType.TOOL_COMPLETED,
+                {
+                    "content": msg.content,
+                    "tool_call_id": tool_use_id,
+                    "is_error": is_error,
+                },
+                native_event_type="user.tool_result",
+                native_metadata=self._native_metadata(msg),
+            )
+            return
+
+        if msg.type == MessageType.ERROR:
+            await self.manager.broadcast(
+                WSEvent(
+                    type=WSEventType.TASK_ERROR,
+                    task_id=self.task.id,
+                    payload={"error": msg.content},
+                )
+            )
+            return
+
+        if msg.type == MessageType.RESULT:
+            self._saw_result = True
+            if msg.data.get("session_id"):
+                self._session_id = str(msg.data["session_id"])
+                self.task.native_session_id = self._session_id
+                self.task.session_id = self._session_id
+                task_repo.update_task_session_id(self.task.id, self._session_id)
+
+            await self._complete_task(
+                success=bool(msg.data.get("success", True)),
+                error=msg.data.get("error"),
+                summary=msg.data.get("result") if msg.data.get("success", True) else None,
+                native_metadata=self._native_metadata(msg),
+            )
+
+    async def _complete_task(
+        self,
+        success: bool,
+        error: str | None = None,
+        summary: str | None = None,
+        native_metadata: dict | None = None,
+    ) -> None:
+        async with self._completion_lock:
+            if self._completed:
+                return
+            self._completed = True
+
+            now = datetime.now(UTC)
+            status = TaskStatus.COMPLETED if success else TaskStatus.FAILED
+            result = TaskResult(success=success, error=error, summary=summary)
+
+            self.task.status = status
+            self.task.result = result
+            self.task.completed_at = now
+            self.task.summary = summary
+            self.task.native_session_id = self._session_id
+            self.task.session_id = self._session_id
+            task_repo.complete_task(self.task, result)
+
+            await self.manager.broadcast(
+                WSEvent(
+                    type=WSEventType.TASK_COMPLETE,
+                    task_id=self.task.id,
+                    payload={
+                        "status": status.value,
+                        "success": success,
+                        "error": error,
+                        "summary": summary,
+                        "session_id": self._session_id,
+                    },
+                )
+            )
+            await self._emit_agent_event(
+                AgentEventType.RUN_COMPLETED if success else AgentEventType.RUN_FAILED,
+                {
+                    "status": status.value,
+                    "success": success,
+                    "error": error,
+                    "summary": summary,
+                },
+                native_event_type="result",
+                native_metadata=native_metadata,
+            )
+
+    async def cancel(self) -> None:
+        if self._process and self._process.returncode is None:
+            try:
+                os.killpg(self._process.pid, signal.SIGTERM)
+            except (ProcessLookupError, PermissionError):
+                self._process.terminate()
+            try:
+                await asyncio.wait_for(self._process.wait(), timeout=5)
+            except TimeoutError:
+                try:
+                    os.killpg(self._process.pid, signal.SIGKILL)
+                except (ProcessLookupError, PermissionError):
+                    self._process.kill()
+
+        async with self._completion_lock:
+            if self._completed:
+                return
+            self._completed = True
+
+            now = datetime.now(UTC)
+            self.task.status = TaskStatus.CANCELLED
+            self.task.completed_at = now
+            self.task.result = TaskResult(success=False, error="Task cancelled")
+            task_repo.complete_task(self.task, self.task.result)
+
+        await self.manager.broadcast(
+            WSEvent(
+                type=WSEventType.TASK_COMPLETE,
+                task_id=self.task.id,
+                payload={
+                    "status": TaskStatus.CANCELLED.value,
+                    "success": False,
+                    "error": "Task cancelled",
+                    "session_id": self._session_id,
+                },
+            )
+        )
+        await self._emit_agent_event(
+            AgentEventType.RUN_COMPLETED,
+            {
+                "status": TaskStatus.CANCELLED.value,
+                "success": False,
+                "error": "Task cancelled",
+            },
+            native_event_type="process.cancelled",
+        )
+
+    def dispose(self) -> None:
+        self._disposed = True
+        if self._process and self._process.returncode is None:
+            try:
+                os.killpg(self._process.pid, signal.SIGKILL)
+            except (ProcessLookupError, PermissionError):
+                pass
+
+    # ── command building ───────────────────────────────────────
+
+    def _find_claude_cli(self) -> str | None:
+        configured = claude_settings.get_cli_path()
+        if configured:
+            return configured
+        return shutil.which("claude")
+
+    def _build_claude_args(self) -> list[str]:
+        args = ["-p", "--verbose", "--output-format", "stream-json"]
+
+        model = self.task.config.model_id or claude_settings.get_model()
+        if model:
+            args.extend(["--model", model])
+
+        permission_mode = claude_settings.get_permission_mode()
+        if permission_mode:
+            args.extend(["--permission-mode", permission_mode])
+
+        if self._session_id:
+            args.extend(["-r", self._session_id])
+
+        args.append(self.task.config.prompt)
+        return args
+
+    def _build_command(self, claude_path: str, workspace: Path) -> tuple[list[str], str | None]:
+        args = self._build_claude_args()
+
+        from swiftagent.storage import settings as app_settings
+
+        sandbox_mode = app_settings.get_sandbox_mode()
+        bwrap_path = shutil.which("bwrap")
+        if sandbox_mode == "strict":
+            if not bwrap_path:
+                raise RuntimeError(
+                    "Strict sandbox is unavailable because bwrap is not installed. "
+                    "Install bwrap, or explicitly select fallback mode in Settings after reviewing its warning."
+                )
+
+            bwrap_usable, reason = check_bwrap_usable(workspace)
+            if not bwrap_usable:
+                raise RuntimeError(
+                    "Strict sandbox is unavailable in this environment "
+                    f"({reason or 'unknown error'}). Install or enable bwrap, or explicitly select fallback mode in Settings."
+                )
+
+            claude_dir = get_state_dir()
+            claude_dir.mkdir(parents=True, exist_ok=True)
+
+            return (
+                [
+                    bwrap_path,
+                    "--die-with-parent",
+                    "--ro-bind",
+                    "/",
+                    "/",
+                    "--dev-bind",
+                    "/dev",
+                    "/dev",
+                    "--proc",
+                    "/proc",
+                    "--tmpfs",
+                    "/tmp",
+                    "--bind",
+                    str(workspace),
+                    str(workspace),
+                    "--bind",
+                    str(claude_dir),
+                    str(claude_dir),
+                    "--chdir",
+                    str(workspace),
+                    "--setenv",
+                    "HOME",
+                    str(Path.home()),
+                    claude_path,
+                    *args,
+                ],
+                None,
+            )
+
+        return (
+            [claude_path, *args],
+            "Fallback mode is active. Claude is not OS-isolated; use only with a workspace and account you trust.",
+        )
+
+    def _build_env(self) -> dict[str, str]:
+        env = os.environ.copy()
+        return env
+
+    async def _emit_agent_event(
+        self,
+        event_type: AgentEventType,
+        payload: dict,
+        *,
+        native_event_type: str,
+        native_metadata: dict | None = None,
+    ) -> None:
+        await self.manager.broadcast_agent_event(
+            AgentEvent(
+                type=event_type,
+                agent_id=self.task.agent_id,
+                adapter_id=self.task.adapter_id,
+                run_id=self.task.id,
+                native_session_id=self._session_id,
+                native_event_type=native_event_type,
+                payload=payload,
+                native_metadata=native_metadata or {},
+            )
+        )
+
+    @staticmethod
+    def _native_metadata(msg: ParsedMessage, max_chars: int = 16_384) -> dict:
+        """Keep useful native diagnostics without allowing unbounded WS frames."""
+        import json
+
+        metadata = msg.data.get("raw") or msg.data
+        if not isinstance(metadata, dict):
+            return {"value": str(metadata)[:max_chars]}
+        try:
+            encoded = json.dumps(metadata, ensure_ascii=False, default=str)
+        except (TypeError, ValueError):
+            return {"value": str(metadata)[:max_chars]}
+        if len(encoded) <= max_chars:
+            return metadata
+        return {
+            "truncated": True,
+            "original_chars": len(encoded),
+            "preview": encoded[:max_chars],
+        }
+
+
+# Source compatibility for integrations importing the historical class name.
+ClaudeAdapter = ClaudeCodeAdapter

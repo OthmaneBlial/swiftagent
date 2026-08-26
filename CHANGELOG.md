@@ -4,6 +4,9 @@ All notable changes are documented here. This project follows semantic versionin
 
 ## Unreleased
 
+- Reap the OpenCode JSON fallback child and stderr stream after malformed output so asyncio transports close before the test or application loop exits.
+- Use Starlette's supported `httpx2` test client and Node 24-based official GitHub Actions to keep verification warning-free.
+
 ## 0.6.0 — 2026-08-27
 
 - Add a verified tagged bundle path with a prebuilt client, clean-install smoke test, SHA-256 checksums, SPDX JSON SBOM, GitHub provenance/SBOM attestations, and five deterministic adapter evaluation receipts.

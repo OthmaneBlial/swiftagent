@@ -219,7 +219,7 @@ class OpenCodeJsonAdapter:
             raise
         except Exception as exc:
             await self._finish(TaskStatus.FAILED, success=False, error=str(exc))
-            self._terminate_process()
+            await self._stop_process()
 
     async def _handle_event(self, event: dict[str, Any]) -> None:
         event_type = str(event.get("type") or "unknown")
@@ -391,18 +391,11 @@ class OpenCodeJsonAdapter:
 
     async def fail(self, error: str) -> None:
         await self._finish(TaskStatus.FAILED, success=False, error=error)
-        self._terminate_process()
+        await self._stop_process()
 
     async def cancel(self) -> None:
         self._cancel_event.set()
-        self._terminate_process()
-        if self._process and self._process.returncode is None:
-            try:
-                await asyncio.wait_for(self._process.wait(), timeout=2)
-            except TimeoutError:
-                self._kill_process()
-                with contextlib.suppress(Exception):
-                    await self._process.wait()
+        await self._stop_process()
         await self._finish(
             TaskStatus.CANCELLED,
             success=False,
@@ -413,6 +406,19 @@ class OpenCodeJsonAdapter:
     def dispose(self) -> None:
         self._disposed = True
         self._terminate_process()
+
+    async def _stop_process(self) -> None:
+        """Stop and reap the child so its asyncio pipes close before the loop does."""
+        self._terminate_process()
+        if self._process:
+            try:
+                await asyncio.wait_for(self._process.wait(), timeout=2)
+            except TimeoutError:
+                self._kill_process()
+                with contextlib.suppress(Exception):
+                    await self._process.wait()
+        if self._stderr_task and self._stderr_task is not asyncio.current_task():
+            await self._stderr_task
 
     def _terminate_process(self) -> None:
         if not self._process or self._process.returncode is not None:

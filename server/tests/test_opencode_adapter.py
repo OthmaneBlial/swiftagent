@@ -8,6 +8,7 @@ import pytest
 
 from swiftagent.agents.opencode import OpenCodeAdapter
 from swiftagent.agents.opencode import settings as opencode_settings
+from swiftagent.agents.opencode.json_adapter import OpenCodeJsonAdapter
 from swiftagent.agents.opencode.status import get_status
 from swiftagent.agents.registry import agent_registry
 from swiftagent.models.agent import AgentEventType
@@ -198,6 +199,9 @@ async def test_opencode_malformed_fallback_fails_only_its_task(client, tmp_path,
     assert persisted is not None and persisted.status is TaskStatus.FAILED
     assert persisted.result is not None
     assert "malformed JSON" in (persisted.result.error or "")
+    assert isinstance(adapter._delegate, OpenCodeJsonAdapter)
+    assert adapter._delegate._process is not None
+    assert adapter._delegate._process.returncode is not None
 
 
 @pytest.mark.asyncio

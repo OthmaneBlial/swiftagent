@@ -97,6 +97,18 @@ def _get_acp_status(definition: AgentDefinition) -> AgentStatus:
     return get_status(definition)
 
 
+def _create_codex_adapter(task: Task, manager: Any) -> AgentAdapter:
+    from swiftagent.agents.codex import CodexAdapter
+
+    return CodexAdapter(task, manager)
+
+
+def _get_codex_status(definition: AgentDefinition) -> AgentStatus:
+    from swiftagent.agents.codex.status import get_status
+
+    return get_status(definition)
+
+
 agent_registry = AgentRegistry()
 agent_registry.register(
     AgentDefinition(
@@ -144,4 +156,32 @@ agent_registry.register(
     ),
     _create_acp_adapter,
     _get_acp_status,
+)
+agent_registry.register(
+    AgentDefinition(
+        agent_id="codex",
+        display_name="Codex",
+        adapter_id="codex-app-server-v2",
+        adapter_version="0.4.0",
+        protocol="codex-app-server-v2",
+        install_url="https://learn.chatgpt.com/docs/codex-cli",
+        documentation_url="https://learn.chatgpt.com/docs/app-server",
+        capabilities=AgentCapabilities(
+            structured_streaming=True,
+            session_resume=True,
+            session_fork=True,
+            tool_events=True,
+            approvals=True,
+            questions=True,
+            plan_updates=True,
+            attachments=True,
+            attachment_types=["image/*"],
+            model_discovery=True,
+            usage=True,
+            native_sandbox=True,
+            external_sandbox="partial",
+        ),
+    ),
+    _create_codex_adapter,
+    _get_codex_status,
 )

@@ -54,6 +54,11 @@ export interface AppSettings {
     claude_permission_mode: string;
     claude_cli_path: string | null;
     acp_command_json: string;
+    codex_model: string | null;
+    codex_cli_path: string | null;
+    codex_approval_policy: 'untrusted' | 'on-request' | 'never';
+    codex_sandbox_mode: 'read-only' | 'workspace-write' | 'danger-full-access';
+    codex_allow_dangerous_bypass: boolean;
     workspace_dir: string;
     sandbox_mode: 'strict' | 'fallback';
 }

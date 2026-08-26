@@ -177,6 +177,19 @@ def test_acp_setting_requires_a_literal_argument_array(client):
     ]
 
 
+def test_empty_acp_setting_does_not_block_unrelated_settings(client):
+    cleared = client.put("/api/settings", json={"acp_command_json": ""})
+    assert cleared.status_code == 200
+
+    current = client.get("/api/settings")
+    assert current.status_code == 200
+    assert current.json()["acp_command_json"] == ""
+
+    updated = client.put("/api/settings", json=current.json())
+    assert updated.status_code == 200
+    assert updated.json()["acp_command_json"] == ""
+
+
 def test_acp_fixture_records_stable_schema_source_and_protocol_version():
     transcript = json.loads((FIXTURES / "schema-v1.21.0-transcript.json").read_text())
     assert transcript["protocolVersion"] == 1

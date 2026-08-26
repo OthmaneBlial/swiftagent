@@ -1,0 +1,19 @@
+{
+  "source": "codex app-server generate-json-schema",
+  "codexVersion": "codex-cli 0.149.1",
+  "protocol": "codex-app-server-v2",
+  "transport": "stdio JSONL",
+  "methods": [
+    "initialize",
+    "initialized",
+    "account/read",
+    "model/list",
+    "thread/start",
+    "thread/resume",
+    "turn/start",
+    "turn/interrupt",
+    "item/commandExecution/requestApproval",
+    "item/fileChange/requestApproval",
+    "item/permissions/requestApproval"
+  ]
+}

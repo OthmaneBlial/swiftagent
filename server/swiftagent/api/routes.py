@@ -12,6 +12,7 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from swiftagent.agents.acp import settings as acp_settings
+from swiftagent.agents.codex import settings as codex_settings
 from swiftagent.agents.registry import agent_registry
 from swiftagent.models.settings import AppSettings
 from swiftagent.models.task import Task
@@ -82,12 +83,37 @@ class SettingsUpdate(BaseModel):
     ) = None
     claude_cli_path: str | None = Field(default=None, max_length=4_096)
     acp_command_json: str | None = Field(default=None, max_length=16_384)
+    codex_model: str | None = Field(default=None, max_length=256)
+    codex_cli_path: str | None = Field(default=None, max_length=4_096)
+    codex_approval_policy: Literal["untrusted", "on-request", "never"] | None = None
+    codex_sandbox_mode: (
+        Literal["read-only", "workspace-write", "danger-full-access"] | None
+    ) = None
+    codex_allow_dangerous_bypass: bool | None = None
     workspace_dir: str | None = Field(default=None, max_length=4_096)
     sandbox_mode: Literal["strict", "fallback"] | None = None
 
 
 @router.put("/settings", response_model=AppSettings)
 async def update_settings(update: SettingsUpdate):
+    prospective_codex_approval = (
+        update.codex_approval_policy or codex_settings.get_approval_policy()
+    )
+    prospective_codex_sandbox = update.codex_sandbox_mode or codex_settings.get_sandbox_mode()
+    prospective_dangerous_bypass = (
+        update.codex_allow_dangerous_bypass
+        if update.codex_allow_dangerous_bypass is not None
+        else codex_settings.get_allow_dangerous_bypass()
+    )
+    try:
+        codex_settings.validate_safety_combination(
+            prospective_codex_approval,
+            prospective_codex_sandbox,
+            prospective_dangerous_bypass,
+        )
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
     if update.debug_mode is not None:
         settings_repo.set_debug_mode(update.debug_mode)
     if update.theme is not None:
@@ -115,6 +141,16 @@ async def update_settings(update: SettingsUpdate):
             except ValueError as exc:
                 raise HTTPException(400, str(exc)) from exc
             acp_settings.set_command(command)
+    if update.codex_model is not None:
+        codex_settings.set_model(update.codex_model or None)
+    if update.codex_cli_path is not None:
+        codex_settings.set_cli_path(update.codex_cli_path or None)
+    if update.codex_approval_policy is not None:
+        codex_settings.set_approval_policy(update.codex_approval_policy)
+    if update.codex_sandbox_mode is not None:
+        codex_settings.set_sandbox_mode(update.codex_sandbox_mode)
+    if update.codex_allow_dangerous_bypass is not None:
+        codex_settings.set_allow_dangerous_bypass(update.codex_allow_dangerous_bypass)
     if update.workspace_dir is not None:
         raw_workspace = update.workspace_dir.strip()
         if not raw_workspace:

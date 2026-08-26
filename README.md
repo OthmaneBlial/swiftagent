@@ -113,7 +113,7 @@ FastAPI ── Task manager ── Agent registry ── selected local adapter
    └── SQLite history/settings and workspace-scoped file API
 ```
 
-More detail: [architecture](docs/ARCHITECTURE.md) · [ACP adapter](docs/ACP_ADAPTER.md) · [demo capture guide](docs/DEMO.md).
+More detail: [architecture](docs/ARCHITECTURE.md) · [ACP adapter](docs/ACP_ADAPTER.md) · [Codex adapter](docs/CODEX_ADAPTER.md) · [demo capture guide](docs/DEMO.md).
 
 ## Quality checks
 
@@ -127,7 +127,7 @@ The server regression suite covers adapter contracts, capability combinations, l
 
 ## Adapter availability
 
-The v0.3 release ships the migrated Claude Code adapter and the agent-neutral extension boundary. The in-development v0.4 line now includes a tested local ACP v1 adapter; configure a compatible agent explicitly, then inspect its negotiated capabilities in **Your agents**. Codex, OpenCode, and a conservative generic-command adapter remain tracked deliverables in [ROADMAP.md](ROADMAP.md) and are not presented as working until their own fixtures and live matrix pass.
+The v0.3 release ships the migrated Claude Code adapter and the agent-neutral extension boundary. The in-development v0.4 line now includes tested local ACP v1 and native Codex app-server adapters; inspect their readiness and effective capabilities in **Your agents**. OpenCode and a conservative generic-command adapter remain tracked deliverables in [ROADMAP.md](ROADMAP.md) and are not presented as working until their own fixtures and live matrix pass.
 
 ## Contributing and release notes
 

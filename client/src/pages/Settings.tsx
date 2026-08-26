@@ -258,6 +258,70 @@ export default function Settings() {
                     </details>
                 ) : null}
 
+                {agents.some((agent) => agent.agent_id === 'codex') ? (
+                    <details className="rounded-2xl border border-border bg-card p-5">
+                        <summary className="cursor-pointer text-sm font-semibold text-foreground">Codex adapter options</summary>
+                        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                            <label className="space-y-1.5">
+                                <span className="text-xs text-muted-foreground">Model override</span>
+                                <input
+                                    value={settings.codex_model ?? ''}
+                                    onChange={(event) => update('codex_model', event.target.value || null)}
+                                    placeholder="Codex default"
+                                    className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm"
+                                />
+                            </label>
+                            <label className="space-y-1.5">
+                                <span className="text-xs text-muted-foreground">Executable path</span>
+                                <input
+                                    value={settings.codex_cli_path ?? ''}
+                                    onChange={(event) => update('codex_cli_path', event.target.value || null)}
+                                    placeholder="Auto-detect codex"
+                                    className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm"
+                                />
+                            </label>
+                            <label className="space-y-1.5">
+                                <span className="text-xs text-muted-foreground">Native approval policy</span>
+                                <select
+                                    value={settings.codex_approval_policy}
+                                    onChange={(event) => update('codex_approval_policy', event.target.value as AppSettings['codex_approval_policy'])}
+                                    className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm"
+                                >
+                                    <option value="untrusted">untrusted · review untrusted commands</option>
+                                    <option value="on-request">on-request · agent may ask</option>
+                                    <option value="never">never · no interactive approvals</option>
+                                </select>
+                            </label>
+                            <label className="space-y-1.5">
+                                <span className="text-xs text-muted-foreground">Native sandbox</span>
+                                <select
+                                    value={settings.codex_sandbox_mode}
+                                    onChange={(event) => update('codex_sandbox_mode', event.target.value as AppSettings['codex_sandbox_mode'])}
+                                    className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm"
+                                >
+                                    <option value="read-only">read-only</option>
+                                    <option value="workspace-write">workspace-write · recommended</option>
+                                    <option value="danger-full-access">danger-full-access · bypass</option>
+                                </select>
+                            </label>
+                        </div>
+                        {settings.codex_approval_policy === 'never' && settings.codex_sandbox_mode === 'danger-full-access' ? (
+                            <label className="mt-4 flex items-start gap-3 rounded-xl border border-red-500/35 bg-red-500/10 p-3 text-xs leading-relaxed text-red-800 dark:text-red-200">
+                                <input
+                                    type="checkbox"
+                                    checked={settings.codex_allow_dangerous_bypass}
+                                    onChange={(event) => update('codex_allow_dangerous_bypass', event.target.checked)}
+                                    className="mt-0.5 h-4 w-4 shrink-0"
+                                />
+                                <span>I understand this disables Codex approvals and its native filesystem sandbox. SwiftAgent fallback mode would then run with my full local user access.</span>
+                            </label>
+                        ) : null}
+                        <p className="mt-3 text-[11px] leading-relaxed text-muted-foreground">
+                            SwiftAgent reuses <code>codex login</code> state. Native Codex safety and SwiftAgent process isolation remain separate layers.
+                        </p>
+                    </details>
+                ) : null}
+
                 <div className="sticky bottom-4 flex justify-end">
                     <button
                         type="button"

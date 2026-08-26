@@ -4,6 +4,8 @@ All notable changes are documented here. This project follows semantic versionin
 
 ## Unreleased
 
+- Add a native Codex app-server v2 adapter with free readiness/auth probes, thread start/resume, model discovery, streamed items, approvals, questions, plan/usage mapping, native safety profiles, interruption, and process cleanup.
+- Require explicit confirmation before combining Codex `never` approvals with `danger-full-access`, while showing native and SwiftAgent safety as separate layers.
 - Add a local ACP v1 client adapter based on the official SDK, with negotiated capabilities, native session creation/loading, permissions, streamed updates, cancellation, and bounded native diagnostics.
 - Confine ACP file and terminal callbacks to the selected workspace, use literal command arrays, cap retained output, and preserve strict Bubblewrap fail-closed behavior.
 - Add settings UI, stable schema evidence, and a deterministic ACP fake-agent contract suite.

@@ -375,6 +375,8 @@ runs with Claude Code, Codex, and OpenCode through the same interface.
 
 ### 1.2 Add the Codex adapter
 
+**Status: completed, validated, and pushed.**
+
 - Detect the Codex CLI and supported app-server protocol/version.
 - Connect using Codex app-server and map threads/turns, streamed items,
   approvals, errors, and cancellation into SwiftAgent events.

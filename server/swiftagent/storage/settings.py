@@ -140,6 +140,12 @@ def get_app_settings() -> AppSettings:
         acp_command_value = json.loads(acp_command_raw) if acp_command_raw else []
     except json.JSONDecodeError:
         acp_command_value = acp_command_raw
+    if isinstance(acp_command_value, list):
+        normalized_acp_command = (
+            json.dumps(acp_command_value, ensure_ascii=False) if acp_command_value else ""
+        )
+    else:
+        normalized_acp_command = acp_command_raw
     return AppSettings(
         debug_mode=get_debug_mode(),
         theme=get_theme(),
@@ -147,10 +153,16 @@ def get_app_settings() -> AppSettings:
         claude_model=get_claude_model(),
         claude_permission_mode=get_claude_permission_mode(),
         claude_cli_path=get_claude_cli_path(),
-        acp_command_json=(
-            json.dumps(acp_command_value, ensure_ascii=False)
-            if isinstance(acp_command_value, list)
-            else acp_command_raw
+        acp_command_json=normalized_acp_command,
+        codex_model=_get("codex_model", "").strip() or None,
+        codex_cli_path=_get(
+            "codex_cli_path", os.environ.get("SWIFTAGENT_CODEX_PATH", "")
+        ).strip()
+        or None,
+        codex_approval_policy=_get("codex_approval_policy", "on-request"),
+        codex_sandbox_mode=_get("codex_sandbox_mode", "workspace-write"),
+        codex_allow_dangerous_bypass=(
+            _get("codex_allow_dangerous_bypass", "0") == "1"
         ),
         workspace_dir=get_workspace_dir(),
         sandbox_mode=get_sandbox_mode(),

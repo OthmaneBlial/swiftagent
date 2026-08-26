@@ -539,6 +539,8 @@ an explicit installation confirmation.
 
 ### 3.3 Build the contribution loop
 
+**Status: completed, validated, seeded on GitHub, and pushed.**
+
 - Seed bounded issues labeled by `core`, `adapter:claude`, `adapter:codex`,
   `adapter:opencode`, `protocol:acp`, `ui`, `security`, and `tests`.
 - Make two real adapter-fixture tasks `good first issue` with exact acceptance

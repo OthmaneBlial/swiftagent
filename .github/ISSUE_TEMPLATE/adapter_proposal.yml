@@ -1,0 +1,56 @@
+name: Adapter proposal
+description: Propose a bounded ACP adapter integration before implementing it.
+title: "[Adapter]: "
+labels: ["protocol:acp"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        SwiftAgent never downloads adapter code. This form scopes a proposal; it does not grant trust or installation approval.
+  - type: input
+    id: agent
+    attributes:
+      label: Agent and exact version
+      placeholder: example-agent 1.2.3
+    validations:
+      required: true
+  - type: input
+    id: protocol
+    attributes:
+      label: ACP command and protocol version
+      description: Use a literal argv description. Do not paste secrets.
+      placeholder: example-agent acp · ACP v1
+    validations:
+      required: true
+  - type: textarea
+    id: value
+    attributes:
+      label: User value
+      description: Explain what this adds beyond the generic ACP integration.
+    validations:
+      required: true
+  - type: textarea
+    id: capabilities
+    attributes:
+      label: Conservative capability scope
+      description: Mark create, resume, tools, approvals, questions, plans, usage, models, modes, attachments, and cancellation as supported, unsupported, or unknown.
+    validations:
+      required: true
+  - type: textarea
+    id: boundaries
+    attributes:
+      label: Authentication, state, and security boundaries
+      description: List auth owner, state directories, environment names, network need, executable origin, and known risks.
+    validations:
+      required: true
+  - type: checkboxes
+    id: acknowledgements
+    attributes:
+      label: Proposal checks
+      options:
+        - label: I read the first-adapter walkthrough and trust policy.
+          required: true
+        - label: I will keep provider credentials and personal paths out of public evidence.
+          required: true
+        - label: I understand a local manifest remains local custom even when its contract passes.
+          required: true

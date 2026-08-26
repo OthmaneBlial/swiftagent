@@ -24,9 +24,17 @@ dependency-free, contain no credentials, and preserve the same acceptance task
 for Claude Code, Codex, and OpenCode.
 
 For a new out-of-process ACP integration, start with the
+[first-adapter walkthrough](docs/FIRST_ADAPTER.md) and
 [Adapter Kit](adapter-kit/README.md). A proposal must include its validated
 manifest, contract report, exact compatibility scope, and completed security
 checklist. A manifest never grants itself built-in or community verification.
+
+Use the structured Adapter proposal and Compatibility report issue forms. The
+maintainer keeps installation Q&A and proposals in issues for now; GitHub
+Discussions should be enabled only when response ownership and cadence are
+explicit. Verified compatibility evidence is credited using the
+[release process](docs/RELEASE_PROCESS.md), even when the contribution is a
+report or reproduction rather than code.
 
 `strict` must fail closed when bwrap is unavailable. Do not reintroduce automatic unsandboxed fallback or widen workspace paths without a security review.
 

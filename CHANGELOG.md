@@ -4,6 +4,7 @@ All notable changes are documented here. This project follows semantic versionin
 
 ## Unreleased
 
+- Add structured adapter proposal and compatibility-report forms, a standalone first-adapter walkthrough, evidence-based release credits, and eight bounded contribution issue seeds.
 - Add backend-enforced and UI-visible adapter trust levels: built-in verified, community verified for exact reviewed evidence, and non-endorsed local custom.
 - Keep trust assignment outside local manifests and document a no-auto-download policy plus signature, provenance, ownership, update, and install-confirmation gates for any future registry.
 - Publish Adapter API 1.0 with a strict local manifest loader, deterministic ACP fake agent, executable contract suite, event fixtures, JSON schema, security checklist, compatibility report, and contributor documentation.

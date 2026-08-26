@@ -1,0 +1,77 @@
+name: Adapter compatibility report
+description: Submit exact, redacted contract evidence for review.
+title: "[Compatibility]: "
+labels: ["protocol:acp", "tests"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Reports cover only the exact versions and systems listed below. A passing contract is necessary but does not automatically grant community verification.
+  - type: input
+    id: identity
+    attributes:
+      label: Agent, adapter, and Adapter API versions
+      placeholder: example-agent 1.2.3 · example-acp 0.2.0 · Adapter API 1.0
+    validations:
+      required: true
+  - type: input
+    id: systems
+    attributes:
+      label: Tested operating systems and architectures
+      placeholder: macOS 15 arm64; Ubuntu 24.04 x86_64
+    validations:
+      required: true
+  - type: textarea
+    id: distribution
+    attributes:
+      label: Executable origin and integrity
+      description: Link the release source and provide checksum or signature evidence when available.
+    validations:
+      required: true
+  - type: textarea
+    id: auth_state
+    attributes:
+      label: Authentication and state boundary
+      description: State who owns login, required state directories, forwarded environment names, and network need. Never include credentials.
+    validations:
+      required: true
+  - type: textarea
+    id: contract
+    attributes:
+      label: Contract command and report
+      description: Paste the exact command and link or attach the redacted JSON report.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: capabilities
+    attributes:
+      label: Capability evidence and known boundaries
+      description: Use only verified, partial, unsupported, or unknown for each declared capability.
+    validations:
+      required: true
+  - type: textarea
+    id: failures
+    attributes:
+      label: Failure, cancellation, timeout, and output-limit evidence
+    validations:
+      required: true
+  - type: input
+    id: maintainer
+    attributes:
+      label: External maintainer and re-test trigger
+    validations:
+      required: true
+  - type: checkboxes
+    id: attestation
+    attributes:
+      label: Attestation
+      options:
+        - label: The public Adapter API contract suite passes for the exact versions above.
+          required: true
+        - label: The security checklist is complete and remaining risks are disclosed.
+          required: true
+        - label: Reports, logs, receipts, and screenshots contain no secrets, native session IDs, or personal paths.
+          required: true
+        - label: I understand compatibility and trust do not roll forward to untested versions.
+          required: true

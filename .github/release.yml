@@ -1,0 +1,24 @@
+changelog:
+  exclude:
+    labels:
+      - duplicate
+      - invalid
+      - wontfix
+  categories:
+    - title: Adapter compatibility and protocols
+      labels:
+        - adapter:claude
+        - adapter:codex
+        - adapter:opencode
+        - protocol:acp
+    - title: Core and security
+      labels:
+        - core
+        - security
+    - title: Interface and testing
+      labels:
+        - ui
+        - tests
+    - title: Other changes
+      labels:
+        - "*"

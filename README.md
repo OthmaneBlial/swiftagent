@@ -142,7 +142,7 @@ FastAPI ── Task manager ── Agent registry ── selected local adapter
    └── SQLite history/settings and workspace-scoped file API
 ```
 
-More detail: [architecture](docs/ARCHITECTURE.md) · [compatibility matrix](docs/COMPATIBILITY.md) · [adapter developer kit](docs/ADAPTER_SDK.md) · [adapter trust policy](docs/ADAPTER_TRUST.md) · [Local Run Receipts](docs/RUN_RECEIPTS.md) · [cross-agent handoffs](docs/HANDOFFS.md) · [ACP adapter](docs/ACP_ADAPTER.md) · [Codex adapter](docs/CODEX_ADAPTER.md) · [OpenCode adapter](docs/OPENCODE_ADAPTER.md) · [generic command adapter](docs/GENERIC_COMMAND_ADAPTER.md) · [reproducible demo](docs/DEMO.md).
+More detail: [architecture](docs/ARCHITECTURE.md) · [compatibility matrix](docs/COMPATIBILITY.md) · [first adapter](docs/FIRST_ADAPTER.md) · [adapter developer kit](docs/ADAPTER_SDK.md) · [adapter trust policy](docs/ADAPTER_TRUST.md) · [release and compatibility credits](docs/RELEASE_PROCESS.md) · [Local Run Receipts](docs/RUN_RECEIPTS.md) · [cross-agent handoffs](docs/HANDOFFS.md) · [ACP adapter](docs/ACP_ADAPTER.md) · [Codex adapter](docs/CODEX_ADAPTER.md) · [OpenCode adapter](docs/OPENCODE_ADAPTER.md) · [generic command adapter](docs/GENERIC_COMMAND_ADAPTER.md) · [reproducible demo](docs/DEMO.md).
 
 ## Quality checks
 

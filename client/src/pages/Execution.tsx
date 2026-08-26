@@ -393,11 +393,11 @@ export default function Execution() {
 
     const prepareHandoff = () => {
         if (!taskId) return;
-        navigate(`/?handoff_from=${encodeURIComponent(taskId)}`);
+        navigate(`/handoff/${encodeURIComponent(taskId)}`);
     };
 
     return (
-        <div className="flex-1 flex flex-col h-screen">
+        <div className="min-w-0 flex-1 flex flex-col h-screen">
             <header className="h-14 border-b border-border flex items-center px-4 gap-3 shrink-0">
                 <button
                     onClick={() => navigate('/')}
@@ -409,7 +409,7 @@ export default function Execution() {
 
                 <div className="flex-1 min-w-0">
                     <div className="flex min-w-0 items-center gap-2">
-                        <p className="truncate text-sm font-medium text-foreground">
+                        <p className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
                             {task?.config.prompt || 'Task execution'}
                         </p>
                         <AgentBadge name={agentName} className="hidden shrink-0 sm:inline-flex" />
@@ -452,7 +452,7 @@ export default function Execution() {
                 ) : null}
             </header>
 
-            <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+            <div ref={scrollRef} className="min-w-0 flex-1 overflow-y-auto overflow-x-hidden px-4 py-4 space-y-4">
                 {loadingTask ? (
                     <div className="flex items-center justify-center py-12 text-sm text-muted-foreground gap-2">
                         <CircleNotch className="w-4 h-4 animate-spin" />
@@ -467,10 +467,10 @@ export default function Execution() {
                             initial={{ opacity: 0, y: 10 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ duration: 0.2 }}
-                            className={`max-w-3xl ${msg.role === 'user' ? 'ml-auto' : 'mr-auto'}`}
+                            className={`min-w-0 max-w-3xl ${msg.role === 'user' ? 'ml-auto' : 'mr-auto'}`}
                         >
                             <div
-                                className={`rounded-2xl px-4 py-3 text-sm leading-relaxed ${
+                                className={`min-w-0 overflow-hidden rounded-2xl px-4 py-3 text-sm leading-relaxed ${
                                     msg.role === 'user'
                                         ? 'bg-primary text-primary-foreground'
                                         : msg.role === 'tool'
@@ -479,13 +479,13 @@ export default function Execution() {
                                 }`}
                             >
                                 {msg.role === 'assistant' ? (
-                                    <div className="prose prose-sm dark:prose-invert max-w-none">
+                                    <div className="prose prose-sm max-w-none break-words dark:prose-invert [&_code]:break-all [&_pre]:max-w-full [&_pre]:overflow-x-auto">
                                         <ReactMarkdown remarkPlugins={[remarkGfm]}>
                                             {msg.content}
                                         </ReactMarkdown>
                                     </div>
                                 ) : (
-                                    <p className="whitespace-pre-wrap">{msg.content}</p>
+                                    <p className="whitespace-pre-wrap break-words">{msg.content}</p>
                                 )}
                             </div>
                         </motion.div>

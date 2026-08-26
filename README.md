@@ -114,7 +114,7 @@ FastAPI ── Task manager ── Agent registry ── selected local adapter
    └── SQLite history/settings and workspace-scoped file API
 ```
 
-More detail: [architecture](docs/ARCHITECTURE.md) · [compatibility matrix](docs/COMPATIBILITY.md) · [Local Run Receipts](docs/RUN_RECEIPTS.md) · [ACP adapter](docs/ACP_ADAPTER.md) · [Codex adapter](docs/CODEX_ADAPTER.md) · [OpenCode adapter](docs/OPENCODE_ADAPTER.md) · [generic command adapter](docs/GENERIC_COMMAND_ADAPTER.md) · [demo capture guide](docs/DEMO.md).
+More detail: [architecture](docs/ARCHITECTURE.md) · [compatibility matrix](docs/COMPATIBILITY.md) · [Local Run Receipts](docs/RUN_RECEIPTS.md) · [cross-agent handoffs](docs/HANDOFFS.md) · [ACP adapter](docs/ACP_ADAPTER.md) · [Codex adapter](docs/CODEX_ADAPTER.md) · [OpenCode adapter](docs/OPENCODE_ADAPTER.md) · [generic command adapter](docs/GENERIC_COMMAND_ADAPTER.md) · [demo capture guide](docs/DEMO.md).
 
 ## Quality checks
 

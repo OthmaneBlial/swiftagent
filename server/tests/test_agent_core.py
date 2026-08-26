@@ -17,7 +17,13 @@ from swiftagent.models.agent import (
 )
 from swiftagent.models.task import Task, TaskConfig, TaskResult, TaskStatus
 from swiftagent.storage import tasks as task_repo
-from swiftagent.storage.database import _migrate_v1, _migrate_v2, _migrate_v3, _migrate_v4
+from swiftagent.storage.database import (
+    _migrate_v1,
+    _migrate_v2,
+    _migrate_v3,
+    _migrate_v4,
+    _migrate_v5,
+)
 
 
 class NoopAdapter:
@@ -369,3 +375,25 @@ def test_v4_migration_adds_receipt_evidence_without_rewriting_legacy_tasks():
     assert receipt is not None
     assert "predates" in json.loads(receipt["git_baseline_json"])["error"]
     assert json.loads(receipt["verification_json"])["status"] == "not_run"
+
+
+def test_v5_migration_adds_single_use_handoff_storage():
+    db = sqlite3.connect(":memory:")
+    db.row_factory = sqlite3.Row
+    _migrate_v1(db)
+    _migrate_v2(db)
+    _migrate_v3(db)
+    _migrate_v4(db)
+    _migrate_v5(db)
+
+    columns = {
+        row["name"] for row in db.execute("PRAGMA table_info(run_handoffs)").fetchall()
+    }
+    assert {
+        "source_task_id",
+        "target_task_id",
+        "content_json",
+        "prompt_text",
+        "status",
+        "expires_at",
+    }.issubset(columns)

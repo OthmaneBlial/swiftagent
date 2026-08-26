@@ -65,6 +65,8 @@ class ReceiptInteractions(BaseModel):
     approvals_approved: int = 0
     approvals_denied: int = 0
     questions_requested: int = 0
+    questions_resolved: int = 0
+    questions_unresolved: int = 0
     latest_plan: dict[str, Any] | None = None
     latest_usage: dict[str, Any] | None = None
 
@@ -119,3 +121,4 @@ class RunReceipt(BaseModel):
     ledger: list[ActivityLedgerEntry] = Field(default_factory=list)
     ledger_total: int = 0
     actions: ReceiptActions
+    handoff_source_run_id: str | None = None

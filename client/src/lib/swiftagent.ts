@@ -106,6 +106,8 @@ export interface RunReceipt {
         approvals_approved: number;
         approvals_denied: number;
         questions_requested: number;
+        questions_resolved: number;
+        questions_unresolved: number;
         latest_plan: Record<string, unknown> | null;
         latest_usage: Record<string, unknown> | null;
     };
@@ -128,6 +130,55 @@ export interface RunReceipt {
         resume_same_agent: boolean;
         create_handoff: boolean;
     };
+    handoff_source_run_id: string | null;
+}
+
+export interface HandoffPreviewRequest {
+    target_agent_id: string;
+    target_model_id?: string;
+    include_intent: boolean;
+    include_summary: boolean;
+    include_changed_files: boolean;
+    include_diff_summary: boolean;
+    include_verification: boolean;
+    include_unresolved_questions: boolean;
+    approved_summary?: string;
+    summary_approved: boolean;
+    user_instructions?: string;
+}
+
+export interface HandoffPreview {
+    schema_version: 1;
+    id: string;
+    source_run_id: string;
+    source_agent_id: string;
+    source_agent_name: string;
+    target_agent_id: string;
+    target_agent_name: string;
+    target_model_id: string | null;
+    content: {
+        original_intent: string | null;
+        approved_summary: string | null;
+        changed_files: string[];
+        diff_summary: string | null;
+        verification: {
+            status: VerificationStatus;
+            summary: string | null;
+            command: string | null;
+        } | null;
+        unresolved_questions: string[];
+        user_instructions: string | null;
+    };
+    rendered_prompt: string;
+    redactions: Array<{
+        category: 'credential' | 'native_session_id' | 'environment_dump' | 'sensitive_path' | 'content_truncated';
+        replacements: number;
+        explanation: string;
+    }>;
+    excluded_by_design: string[];
+    status: 'prepared' | 'starting' | 'started' | 'failed';
+    created_at: string;
+    expires_at: string;
 }
 
 export interface AppSettings {
@@ -301,6 +352,13 @@ export const api = {
     listTasks: () => apiFetch<Task[]>('/tasks'),
     getTask: (id: string) => apiFetch<Task>(`/tasks/${id}`),
     getRunReceipt: (id: string) => apiFetch<RunReceipt>(`/tasks/${id}/receipt`),
+    previewHandoff: (id: string, request: HandoffPreviewRequest) =>
+        apiFetch<HandoffPreview>(`/tasks/${id}/handoff/preview`, {
+            method: 'POST',
+            body: JSON.stringify(request),
+        }),
+    startHandoff: (handoffId: string) =>
+        apiFetch<Task>(`/handoffs/${handoffId}/start`, { method: 'POST' }),
     updateRunVerification: (
         id: string,
         update: { status: VerificationStatus; summary?: string; command?: string },

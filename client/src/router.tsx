@@ -7,6 +7,7 @@ const Execution = lazy(() => import('./pages/Execution'));
 const History = lazy(() => import('./pages/History'));
 const Settings = lazy(() => import('./pages/Settings'));
 const Files = lazy(() => import('./pages/Files'));
+const Handoff = lazy(() => import('./pages/Handoff'));
 
 function Page({ children }: { children: ReactNode }) {
     return (
@@ -23,6 +24,7 @@ export default function Router() {
                 <Route element={<Layout />}>
                     <Route path="/" element={<Page><Home /></Page>} />
                     <Route path="/task/:taskId" element={<Page><Execution /></Page>} />
+                    <Route path="/handoff/:taskId" element={<Page><Handoff /></Page>} />
                     <Route path="/history" element={<Page><History /></Page>} />
                     <Route path="/files" element={<Page><Files /></Page>} />
                     <Route path="/settings" element={<Page><Settings /></Page>} />

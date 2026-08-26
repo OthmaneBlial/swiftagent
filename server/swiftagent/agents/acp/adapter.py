@@ -233,6 +233,14 @@ class AcpAdapter:
                 (method for method in supported if method.id == answer.strip()),
                 None,
             )
+            await self.emit_event(
+                AgentEventType.QUESTION_RESOLVED,
+                {
+                    "request_id": request_id,
+                    "answered": bool(answer.strip()) and selected is not None,
+                },
+                native_event_type="initialize.authMethods",
+            )
             if selected is None:
                 raise RuntimeError("No valid ACP authentication method was selected")
         await asyncio.wait_for(self._connection.authenticate(method_id=selected.id), timeout=120)

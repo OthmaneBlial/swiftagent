@@ -86,6 +86,7 @@ class AgentEventType(StrEnum):
     APPROVAL_REQUESTED = "approval.requested"
     APPROVAL_RESOLVED = "approval.resolved"
     QUESTION_REQUESTED = "question.requested"
+    QUESTION_RESOLVED = "question.resolved"
     PLAN_UPDATED = "plan.updated"
     USAGE_UPDATED = "usage.updated"
     RUN_COMPLETED = "run.completed"

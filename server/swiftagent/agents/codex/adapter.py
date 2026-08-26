@@ -604,6 +604,11 @@ class CodexAdapter:
                     payload={"id": request_id, "question": prompt},
                 ),
             )
+            await self._emit_event(
+                AgentEventType.QUESTION_RESOLVED,
+                {"request_id": request_id, "answered": bool(answer)},
+                native_event_type="item/tool/requestUserInput",
+            )
             answers[question_id] = {"answers": [answer] if answer else []}
         return {"answers": answers}
 

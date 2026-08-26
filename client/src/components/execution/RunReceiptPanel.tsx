@@ -11,6 +11,7 @@ import {
 } from '@phosphor-icons/react';
 import { api, type RunReceipt, type VerificationStatus } from '../../lib/swiftagent';
 import { toast } from '../../lib/toast';
+import { Link } from 'react-router';
 
 interface RunReceiptPanelProps {
     receipt: RunReceipt;
@@ -88,7 +89,7 @@ export default function RunReceiptPanel({
     const resultText = receipt.result?.summary || receipt.result?.error || 'No terminal result yet.';
 
     return (
-        <section className="mx-auto w-full max-w-4xl overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+        <section className="mx-auto min-w-0 w-full max-w-4xl overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
             <div className="flex flex-wrap items-center gap-3 border-b border-border bg-muted/30 px-5 py-4">
                 <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
                     <Receipt weight="duotone" className="h-5 w-5" />
@@ -96,6 +97,14 @@ export default function RunReceiptPanel({
                 <div className="min-w-0 flex-1">
                     <h2 className="text-sm font-semibold text-foreground">Local Run Receipt</h2>
                     <p className="truncate font-mono text-[11px] text-muted-foreground">{receipt.run_id}</p>
+                    {receipt.handoff_source_run_id ? (
+                        <Link
+                            to={`/task/${receipt.handoff_source_run_id}`}
+                            className="mt-1 inline-flex text-[11px] font-medium text-primary hover:underline"
+                        >
+                            Handoff from run {receipt.handoff_source_run_id}
+                        </Link>
+                    ) : null}
                 </div>
                 <span className="rounded-full border border-border bg-background px-2.5 py-1 text-[11px] font-medium capitalize text-foreground">
                     {statusLabel(receipt.status)}
@@ -116,7 +125,7 @@ export default function RunReceiptPanel({
                 </button>
             </div>
 
-            <div className="space-y-5 p-5">
+            <div className="min-w-0 space-y-5 p-5">
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                     {[
                         ['Agent', receipt.agent.display_name],
@@ -136,12 +145,12 @@ export default function RunReceiptPanel({
                     ))}
                 </div>
 
-                <div className="rounded-xl border border-border bg-background p-4">
+                <div className="min-w-0 rounded-xl border border-border bg-background p-4">
                     <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Intent</p>
-                    <p className="mt-2 whitespace-pre-wrap text-sm text-foreground">{receipt.intent}</p>
+                    <p className="mt-2 whitespace-pre-wrap break-words text-sm text-foreground">{receipt.intent}</p>
                     <div className="mt-4 border-t border-border pt-4">
                         <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Result</p>
-                        <p className="mt-2 whitespace-pre-wrap text-sm text-foreground">{resultText}</p>
+                        <p className="mt-2 whitespace-pre-wrap break-words text-sm text-foreground">{resultText}</p>
                     </div>
                 </div>
 
@@ -150,7 +159,7 @@ export default function RunReceiptPanel({
                         <ShieldCheck className="h-4 w-4 text-primary" /> Safety layers
                     </div>
                     <div className="grid gap-3 md:grid-cols-2">
-                        <div className="rounded-xl border border-border bg-background p-4">
+                        <div className="min-w-0 rounded-xl border border-border bg-background p-4">
                             <p className="text-xs font-semibold text-foreground">Native agent controls</p>
                             <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
                                 {native.supported ? 'Exposed' : 'Not exposed'} · mode {native.mode || 'unknown'}
@@ -158,7 +167,7 @@ export default function RunReceiptPanel({
                             </p>
                             {native.notice ? <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">{native.notice}</p> : null}
                         </div>
-                        <div className="rounded-xl border border-border bg-background p-4">
+                        <div className="min-w-0 rounded-xl border border-border bg-background p-4">
                             <p className="text-xs font-semibold text-foreground">SwiftAgent isolation</p>
                             <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
                                 Requested {isolation.mode || 'unknown'} · {isolation.active === true ? 'active' : isolation.active === false ? 'not active' : 'unverified'}
@@ -170,7 +179,7 @@ export default function RunReceiptPanel({
                 </div>
 
                 <div className="grid gap-4 lg:grid-cols-2">
-                    <div className="rounded-xl border border-border bg-background p-4">
+                    <div className="min-w-0 rounded-xl border border-border bg-background p-4">
                         <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
                             <GitDiff className="h-4 w-4 text-primary" /> Git impact
                         </div>
@@ -200,7 +209,7 @@ export default function RunReceiptPanel({
                         )}
                     </div>
 
-                    <div className="rounded-xl border border-border bg-background p-4">
+                    <div className="min-w-0 rounded-xl border border-border bg-background p-4">
                         <div className="flex items-center justify-between gap-2">
                             <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
                                 <Flask className="h-4 w-4 text-primary" /> Verification
@@ -245,19 +254,19 @@ export default function RunReceiptPanel({
                 </div>
 
                 <div className="grid gap-3 md:grid-cols-3">
-                    <div className="rounded-xl border border-border bg-background p-4">
+                    <div className="min-w-0 rounded-xl border border-border bg-background p-4">
                         <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Interactions</p>
                         <p className="mt-2 text-xs text-foreground">
                             {receipt.interactions.tools_started} tools · {receipt.interactions.approvals_requested} approvals · {receipt.interactions.approvals_denied} denied · {receipt.interactions.questions_requested} questions
                         </p>
                     </div>
-                    <div className="rounded-xl border border-border bg-background p-4">
+                    <div className="min-w-0 rounded-xl border border-border bg-background p-4">
                         <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Latest plan state</p>
                         <pre className="mt-2 max-h-28 overflow-auto whitespace-pre-wrap text-[10px] text-foreground">
                             {receipt.interactions.latest_plan ? JSON.stringify(receipt.interactions.latest_plan, null, 2) : 'Not reported'}
                         </pre>
                     </div>
-                    <div className="rounded-xl border border-border bg-background p-4">
+                    <div className="min-w-0 rounded-xl border border-border bg-background p-4">
                         <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Latest usage</p>
                         <pre className="mt-2 max-h-28 overflow-auto whitespace-pre-wrap text-[10px] text-foreground">
                             {receipt.interactions.latest_usage ? JSON.stringify(receipt.interactions.latest_usage, null, 2) : 'Not reported'}
@@ -265,29 +274,29 @@ export default function RunReceiptPanel({
                     </div>
                 </div>
 
-                <div className="rounded-xl border border-border bg-background p-4">
+                <div className="min-w-0 rounded-xl border border-border bg-background p-4">
                     <p className="text-sm font-semibold text-foreground">Normalized activity ledger</p>
                     <p className="mt-1 text-xs text-muted-foreground">
                         {receipt.ledger.length < receipt.ledger_total ? `${receipt.ledger.length} shown of ` : ''}{receipt.ledger_total} persisted event(s) · {receipt.interactions.tools_started} tools · {receipt.interactions.approvals_requested} approvals ({receipt.interactions.approvals_denied} denied) · {receipt.interactions.questions_requested} questions
                     </p>
                     <div className="mt-3 max-h-96 space-y-2 overflow-auto pr-1">
                         {receipt.ledger.length ? receipt.ledger.map((entry) => (
-                            <details key={entry.sequence} className="group rounded-lg border border-border bg-muted/30">
+                            <details key={entry.sequence} className="group min-w-0 rounded-lg border border-border bg-muted/30">
                                 <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-2 text-xs text-foreground">
                                     <CaretDown className="h-3 w-3 shrink-0 -rotate-90 transition-transform group-open:rotate-0" />
                                     <span className="shrink-0 font-mono text-[10px] text-muted-foreground">#{entry.sequence}</span>
                                     <span className="min-w-0 flex-1 truncate">{entry.summary}</span>
                                     <span className="shrink-0 font-mono text-[10px] text-muted-foreground">{entry.type}</span>
                                 </summary>
-                                <div className="space-y-2 border-t border-border px-3 py-3">
+                                <div className="min-w-0 space-y-2 border-t border-border px-3 py-3">
                                     <p className="text-[11px] text-muted-foreground">{new Date(entry.timestamp).toLocaleString()} · native {entry.native_event_type || 'not reported'}</p>
                                     <div>
                                         <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Normalized payload</p>
-                                        <pre className="max-h-52 overflow-auto rounded-md bg-background p-2 text-[10px] text-foreground">{JSON.stringify(entry.payload, null, 2)}</pre>
+                                        <pre className="max-h-52 max-w-full overflow-auto rounded-md bg-background p-2 text-[10px] text-foreground">{JSON.stringify(entry.payload, null, 2)}</pre>
                                     </div>
                                     <div>
                                         <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Native details</p>
-                                        <pre className="max-h-52 overflow-auto rounded-md bg-background p-2 text-[10px] text-foreground">{JSON.stringify(entry.native_metadata, null, 2)}</pre>
+                                        <pre className="max-h-52 max-w-full overflow-auto rounded-md bg-background p-2 text-[10px] text-foreground">{JSON.stringify(entry.native_metadata, null, 2)}</pre>
                                     </div>
                                 </div>
                             </details>

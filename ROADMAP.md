@@ -473,6 +473,8 @@ safety because two agents display the same SwiftAgent mode name.
 
 ### 2.2 Add deliberate cross-agent handoff
 
+**Status: completed, validated, and pushed.**
+
 “Continue with another agent” creates a new run after showing a redaction and
 content preview. The handoff can include:
 

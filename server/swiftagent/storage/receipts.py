@@ -264,6 +264,8 @@ def _ledger_summary(event: AgentEvent) -> str:
         return f"Approval resolved: {payload.get('outcome') or 'unknown'}"
     if event.type is AgentEventType.QUESTION_REQUESTED:
         return "Question requested"
+    if event.type is AgentEventType.QUESTION_RESOLVED:
+        return "Question answered" if event.payload.get("answered") else "Question left unresolved"
     if event.type is AgentEventType.PLAN_UPDATED:
         return "Plan updated"
     if event.type is AgentEventType.USAGE_UPDATED:
@@ -276,6 +278,8 @@ def _ledger_summary(event: AgentEvent) -> str:
 def _interaction_summary(events: list[tuple[int, AgentEvent]]) -> ReceiptInteractions:
     summary = ReceiptInteractions()
     requests: dict[str, dict[str, Any]] = {}
+    questions: set[str] = set()
+    resolved_questions: set[str] = set()
     for _, event in events:
         if event.type is AgentEventType.TOOL_STARTED:
             summary.tools_started += 1
@@ -303,10 +307,18 @@ def _interaction_summary(events: list[tuple[int, AgentEvent]]) -> ReceiptInterac
                 summary.approvals_approved += 1
         elif event.type is AgentEventType.QUESTION_REQUESTED:
             summary.questions_requested += 1
+            questions.add(str(event.payload.get("request_id") or f"event-{event.timestamp}"))
+        elif event.type is AgentEventType.QUESTION_RESOLVED:
+            if event.payload.get("answered"):
+                summary.questions_resolved += 1
+                resolved_questions.add(
+                    str(event.payload.get("request_id") or f"event-{event.timestamp}")
+                )
         elif event.type is AgentEventType.PLAN_UPDATED:
             summary.latest_plan = event.payload
         elif event.type is AgentEventType.USAGE_UPDATED:
             summary.latest_usage = event.payload
+    summary.questions_unresolved = len(questions - resolved_questions)
     return summary
 
 
@@ -467,6 +479,8 @@ def get_receipt(task_id: str) -> RunReceipt | None:
     baseline = json.loads(row["git_baseline_json"])
     final = json.loads(row["git_final_json"]) if row["git_final_json"] else None
     terminal = task.status in {TaskStatus.COMPLETED, TaskStatus.FAILED, TaskStatus.CANCELLED}
+    from swiftagent.storage import handoffs as handoff_repo
+
     return RunReceipt(
         run_id=task.id,
         intent=task.config.prompt,
@@ -500,6 +514,7 @@ def get_receipt(task_id: str) -> RunReceipt | None:
             ),
             create_handoff=terminal,
         ),
+        handoff_source_run_id=handoff_repo.get_source_run_id(task_id),
     )
 
 
@@ -519,6 +534,7 @@ def receipt_as_markdown(receipt: RunReceipt) -> str:
         f"- Adapter: `{receipt.agent.adapter_id}` v{receipt.agent.adapter_version}",
         f"- Protocol: `{receipt.agent.protocol}`",
         f"- Model: `{receipt.agent.model or 'not reported'}`",
+        f"- Handoff source run: `{receipt.handoff_source_run_id or 'none'}`",
         f"- Workspace: `{receipt.workspace}`",
         f"- Started: {receipt.started_at.isoformat()}",
         f"- Completed: {receipt.completed_at.isoformat() if receipt.completed_at else 'not complete'}",

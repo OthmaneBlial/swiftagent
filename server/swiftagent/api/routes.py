@@ -18,6 +18,8 @@ from swiftagent.agents.generic_command import settings as generic_command_settin
 from swiftagent.agents.generic_command.tester import run_disposable_test
 from swiftagent.agents.opencode import settings as opencode_settings
 from swiftagent.agents.registry import agent_registry
+from swiftagent.handoff import create_preview, start_handoff
+from swiftagent.models.handoff import HandoffPreview, HandoffPreviewRequest
 from swiftagent.models.receipt import RunReceipt, VerificationEvidence
 from swiftagent.models.settings import AppSettings
 from swiftagent.models.task import Task
@@ -116,6 +118,31 @@ async def export_run_receipt(
             "Content-Disposition": f'attachment; filename="swiftagent-receipt-{task_id}.{extension}"'
         },
     )
+
+
+@router.post("/tasks/{task_id}/handoff/preview", response_model=HandoffPreview)
+async def preview_cross_agent_handoff(task_id: str, request: HandoffPreviewRequest):
+    try:
+        return create_preview(task_id, request)
+    except ValueError as exc:
+        message = str(exc)
+        status_code = 404 if "not found" in message.lower() else 400
+        raise HTTPException(status_code, message) from exc
+
+
+@router.post("/handoffs/{handoff_id}/start", response_model=Task)
+async def execute_cross_agent_handoff(handoff_id: str):
+    try:
+        return await start_handoff(handoff_id)
+    except (OSError, RuntimeError, ValueError) as exc:
+        message = str(exc)
+        if "not found" in message.lower():
+            status_code = 404
+        elif "already used" in message.lower() or "expired" in message.lower():
+            status_code = 409
+        else:
+            status_code = 400
+        raise HTTPException(status_code, message) from exc
 
 
 @router.delete("/tasks/{task_id}")

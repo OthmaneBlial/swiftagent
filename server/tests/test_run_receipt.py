@@ -156,6 +156,7 @@ def test_receipt_persists_git_safety_interactions_and_explicit_verification(clie
     assert receipt["interactions"]["approvals_requested"] == 1
     assert receipt["interactions"]["approvals_denied"] == 1
     assert receipt["interactions"]["questions_requested"] == 1
+    assert receipt["interactions"]["questions_unresolved"] == 1
     assert receipt["interactions"]["latest_plan"]["entries"][0]["step"] == "Inspect"
     assert receipt["git"]["initial_dirty"] is False
     assert receipt["git"]["changed_files"] == ["new file.txt", "tracked.txt"]

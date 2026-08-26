@@ -16,7 +16,7 @@ _db: sqlite3.Connection | None = None
 _db_path: str | None = None
 _lock = threading.RLock()
 
-CURRENT_SCHEMA_VERSION = 4
+CURRENT_SCHEMA_VERSION = 5
 
 
 def init_database(db_path: str) -> sqlite3.Connection:
@@ -89,6 +89,8 @@ def _run_migrations(db: sqlite3.Connection) -> None:
         _migrate_v3(db)
     if current_version < 4:
         _migrate_v4(db)
+    if current_version < 5:
+        _migrate_v5(db)
 
     if current_version == 0:
         db.execute("INSERT INTO schema_version (version) VALUES (?)", (CURRENT_SCHEMA_VERSION,))
@@ -268,3 +270,36 @@ def _migrate_v4(db: sqlite3.Connection) -> None:
                 now,
             ),
         )
+
+
+def _migrate_v5(db: sqlite3.Connection) -> None:
+    """Persist sanitized, single-use cross-agent handoff previews."""
+    db.execute(
+        """
+        CREATE TABLE IF NOT EXISTS run_handoffs (
+            id TEXT PRIMARY KEY,
+            source_task_id TEXT NOT NULL,
+            target_task_id TEXT UNIQUE,
+            target_agent_id TEXT NOT NULL,
+            target_model_id TEXT,
+            content_json TEXT NOT NULL,
+            prompt_text TEXT NOT NULL,
+            redactions_json TEXT NOT NULL,
+            excluded_json TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'prepared',
+            created_at TEXT NOT NULL,
+            expires_at TEXT NOT NULL,
+            consumed_at TEXT,
+            error TEXT,
+            FOREIGN KEY (source_task_id) REFERENCES tasks(id) ON DELETE CASCADE,
+            FOREIGN KEY (target_task_id) REFERENCES tasks(id) ON DELETE SET NULL
+        )
+        """
+    )
+    db.execute(
+        "CREATE INDEX IF NOT EXISTS idx_run_handoffs_source_created "
+        "ON run_handoffs(source_task_id, created_at DESC)"
+    )
+    db.execute(
+        "CREATE INDEX IF NOT EXISTS idx_run_handoffs_target ON run_handoffs(target_task_id)"
+    )

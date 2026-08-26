@@ -8,19 +8,23 @@ import {
     ArrowRight,
 } from '@phosphor-icons/react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { api, type Task } from '../lib/swiftagent';
+import AgentBadge from '../components/agents/AgentBadge';
+import { api, type AgentStatus, type Task } from '../lib/swiftagent';
 import { toast } from '../lib/toast';
 
 export default function History() {
     const [tasks, setTasks] = useState<Task[]>([]);
+    const [agents, setAgents] = useState<AgentStatus[]>([]);
+    const [agentFilter, setAgentFilter] = useState('all');
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         let cancelled = false;
-        api.listTasks()
-            .then((t) => {
+        Promise.all([api.listTasks(), api.listAgents().catch(() => null)])
+            .then(([t, catalog]) => {
                 if (cancelled) return;
                 setTasks(t);
+                setAgents(catalog?.agents ?? []);
             })
             .catch((error: Error) => {
                 if (cancelled) return;
@@ -64,10 +68,16 @@ export default function History() {
         return <ClockCounterClockwise weight="regular" className="w-4 h-4 text-muted-foreground" />;
     };
 
+    const agentName = (agentId: string) =>
+        agents.find((agent) => agent.agent_id === agentId)?.display_name || agentId;
+    const visibleTasks = agentFilter === 'all'
+        ? tasks
+        : tasks.filter((task) => task.agent_id === agentFilter);
+
     return (
         <div className="flex-1 flex flex-col">
             {/* Header */}
-            <header className="h-14 border-b border-border flex items-center justify-between px-4 shrink-0">
+            <header className="min-h-14 border-b border-border flex flex-wrap items-center justify-between gap-3 px-4 py-2 shrink-0">
                 <div className="flex items-center gap-2">
                     <ClockCounterClockwise weight="bold" className="w-5 h-5 text-foreground" />
                     <h1 className="text-sm font-semibold text-foreground">Task History</h1>
@@ -76,15 +86,28 @@ export default function History() {
                     </span>
                 </div>
 
-                {tasks.length > 0 && (
-                    <button
-                        onClick={handleClearAll}
-                        className="text-xs text-muted-foreground hover:text-destructive transition-colors flex items-center gap-1"
+                <div className="flex items-center gap-2">
+                    <select
+                        value={agentFilter}
+                        onChange={(event) => setAgentFilter(event.target.value)}
+                        className="h-8 rounded-lg border border-border bg-background px-2 text-xs text-foreground"
+                        aria-label="Filter history by agent"
                     >
-                        <Trash weight="regular" className="w-3.5 h-3.5" />
-                        Clear all
-                    </button>
-                )}
+                        <option value="all">All agents</option>
+                        {[...new Map(tasks.map((task) => [task.agent_id, task])).keys()].map((agentId) => (
+                            <option key={agentId} value={agentId}>{agentName(agentId)}</option>
+                        ))}
+                    </select>
+                    {tasks.length > 0 && (
+                        <button
+                            onClick={handleClearAll}
+                            className="text-xs text-muted-foreground hover:text-destructive transition-colors flex items-center gap-1"
+                        >
+                            <Trash weight="regular" className="w-3.5 h-3.5" />
+                            Clear all
+                        </button>
+                    )}
+                </div>
             </header>
 
             {/* Task list */}
@@ -93,7 +116,7 @@ export default function History() {
                     <div className="flex items-center justify-center py-12 text-muted-foreground text-sm">
                         Loading...
                     </div>
-                ) : tasks.length === 0 ? (
+                ) : visibleTasks.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-12 gap-2 text-muted-foreground">
                         <ClockCounterClockwise weight="thin" className="w-12 h-12" />
                         <p className="text-sm">No tasks yet</p>
@@ -107,7 +130,7 @@ export default function History() {
                 ) : (
                     <AnimatePresence>
                         <div className="space-y-2 max-w-2xl mx-auto">
-                            {tasks.map((task, i) => (
+                            {visibleTasks.map((task, i) => (
                                 <motion.div
                                     key={task.id}
                                     initial={{ opacity: 0, y: 10 }}
@@ -125,14 +148,17 @@ export default function History() {
                                             <p className="text-sm font-medium text-foreground truncate">
                                                 {task.config.prompt}
                                             </p>
-                                            <p className="text-xs text-muted-foreground mt-0.5">
-                                                {new Date(task.created_at).toLocaleDateString(undefined, {
-                                                    month: 'short',
-                                                    day: 'numeric',
-                                                    hour: '2-digit',
-                                                    minute: '2-digit',
-                                                })}
-                                            </p>
+                                            <div className="mt-1 flex flex-wrap items-center gap-2">
+                                                <AgentBadge name={agentName(task.agent_id)} muted />
+                                                <span className="text-xs text-muted-foreground">
+                                                    {new Date(task.created_at).toLocaleDateString(undefined, {
+                                                        month: 'short',
+                                                        day: 'numeric',
+                                                        hour: '2-digit',
+                                                        minute: '2-digit',
+                                                    })}
+                                                </span>
+                                            </div>
                                         </div>
 
                                         <button

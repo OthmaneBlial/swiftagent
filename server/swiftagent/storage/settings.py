@@ -73,6 +73,14 @@ def set_theme(theme: str) -> None:
     _set("theme", normalized)
 
 
+def get_default_agent_id() -> str:
+    return _get("default_agent_id", "claude-code").strip() or "claude-code"
+
+
+def set_default_agent_id(agent_id: str) -> None:
+    _set("default_agent_id", agent_id.strip())
+
+
 def get_claude_model() -> str | None:
     value = _get("claude_model", os.environ.get("CLAUDE_MODEL", "")).strip()
     return value or None
@@ -127,6 +135,7 @@ def get_app_settings() -> AppSettings:
     return AppSettings(
         debug_mode=get_debug_mode(),
         theme=get_theme(),
+        default_agent_id=get_default_agent_id(),
         claude_model=get_claude_model(),
         claude_permission_mode=get_claude_permission_mode(),
         claude_cli_path=get_claude_cli_path(),

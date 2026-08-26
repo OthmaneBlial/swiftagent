@@ -38,6 +38,8 @@ class AgentDefinition(BaseModel):
     adapter_id: str = Field(pattern=r"^[a-z0-9][a-z0-9-]{0,63}$")
     adapter_version: str = Field(min_length=1, max_length=64)
     protocol: str = Field(min_length=1, max_length=64)
+    install_url: str | None = None
+    documentation_url: str | None = None
     capabilities: AgentCapabilities
 
 
@@ -49,14 +51,16 @@ class AgentStatus(BaseModel):
     adapter_id: str
     adapter_version: str
     protocol: str
+    install_url: str | None = None
+    documentation_url: str | None = None
     installed: bool
-    executable_path: str | None = None
-    version: str | None = None
+    executable_path: str | None = Field(default=None, max_length=4_096)
+    version: str | None = Field(default=None, max_length=256)
     compatible: bool | None = None
     auth_status: Literal["not_checked", "ready", "action_required", "unknown", "error"] = (
         "not_checked"
     )
-    detail: str | None = None
+    detail: str | None = Field(default=None, max_length=1_024)
     checked_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     capabilities: AgentCapabilities
 

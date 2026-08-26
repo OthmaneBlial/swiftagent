@@ -11,6 +11,7 @@ from typing import Literal
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
+from swiftagent.agents.registry import agent_registry
 from swiftagent.models.settings import AppSettings
 from swiftagent.models.task import Task
 from swiftagent.storage import settings as settings_repo
@@ -71,6 +72,9 @@ async def get_settings():
 class SettingsUpdate(BaseModel):
     debug_mode: bool | None = None
     theme: Literal["light", "dark", "system"] | None = None
+    default_agent_id: str | None = Field(
+        default=None, pattern=r"^[a-z0-9][a-z0-9-]{0,63}$"
+    )
     claude_model: str | None = Field(default=None, max_length=256)
     claude_permission_mode: (
         Literal["default", "acceptEdits", "dontAsk", "bypassPermissions", "plan"] | None
@@ -86,6 +90,12 @@ async def update_settings(update: SettingsUpdate):
         settings_repo.set_debug_mode(update.debug_mode)
     if update.theme is not None:
         settings_repo.set_theme(update.theme)
+    if update.default_agent_id is not None:
+        try:
+            agent_registry.definition(update.default_agent_id)
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+        settings_repo.set_default_agent_id(update.default_agent_id)
     if update.claude_model is not None:
         settings_repo.set_claude_model(update.claude_model)
     if update.claude_permission_mode is not None:
@@ -109,6 +119,20 @@ async def update_settings(update: SettingsUpdate):
         settings_repo.set_sandbox_mode(update.sandbox_mode)
 
     return settings_repo.get_app_settings()
+
+
+# ═══════════════════════════════════════════════════════════════
+# Agents
+# ═══════════════════════════════════════════════════════════════
+
+
+@router.get("/agents")
+async def list_agents(refresh: bool = Query(default=False)):
+    """Return read-only local readiness and declared capabilities."""
+    return {
+        "default_agent_id": settings_repo.get_default_agent_id(),
+        "agents": agent_registry.statuses(refresh=refresh),
+    }
 
 
 @router.get("/engine/status")

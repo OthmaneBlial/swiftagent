@@ -8,6 +8,7 @@ import subprocess
 from datetime import UTC, datetime
 
 from swiftagent.agents.claude import settings as claude_settings
+from swiftagent.models.agent import AgentDefinition, AgentStatus
 from swiftagent.storage import settings as settings_repo
 from swiftagent.tools.sandbox import check_bwrap_usable
 from swiftagent.tools.workspace import get_workspace_dir
@@ -22,6 +23,56 @@ AUTH_PROBE_CACHE: dict[str, str | None] = {
 def resolve_cli_path() -> str | None:
     configured = claude_settings.get_cli_path()
     return configured or shutil.which("claude")
+
+
+def get_status(definition: AgentDefinition) -> AgentStatus:
+    """Probe installation/version locally without making a model request."""
+    executable = resolve_cli_path()
+    if not executable:
+        return AgentStatus(
+            **definition.model_dump(),
+            installed=False,
+            compatible=False,
+            auth_status="not_checked",
+            detail="Claude Code was not found on PATH. Install it, then refresh.",
+        )
+
+    version = None
+    compatible: bool | None = None
+    detail = "Detected. Authentication is checked by Claude Code when a run starts."
+    try:
+        proc = subprocess.run(
+            [executable, "--version"],
+            capture_output=True,
+            text=True,
+            timeout=3,
+            check=False,
+        )
+        raw_version = (proc.stdout or proc.stderr or "").strip()
+        if proc.returncode == 0 and raw_version:
+            version = raw_version[:256]
+            compatible = None
+            detail = (
+                "Detected locally. This version has not yet passed SwiftAgent's published live "
+                "compatibility matrix."
+            )
+        else:
+            version = None
+            compatible = False
+            detail = "The Claude executable was found but its version check failed."
+    except (OSError, subprocess.SubprocessError) as exc:
+        compatible = False
+        detail = f"The Claude executable could not be inspected: {exc}"
+
+    return AgentStatus(
+        **definition.model_dump(),
+        installed=True,
+        executable_path=executable,
+        version=version,
+        compatible=compatible,
+        auth_status="unknown",
+        detail=detail,
+    )
 
 
 def probe_auth(claude_path: str | None, model: str | None) -> tuple[str, str | None]:

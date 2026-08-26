@@ -14,6 +14,7 @@ class AppSettings(BaseModel):
 
     debug_mode: bool = False
     theme: Literal["light", "dark", "system"] = "system"
+    default_agent_id: str = "claude-code"
     claude_model: str | None = None
     claude_permission_mode: str = "default"
     claude_cli_path: str | None = None

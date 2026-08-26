@@ -14,6 +14,11 @@ export interface Task {
     status: string;
     messages: TaskMessage[];
     result: TaskResult | null;
+    agent_id: string;
+    adapter_id: string;
+    adapter_version: string;
+    native_session_id: string | null;
+    capability_snapshot: Record<string, unknown>;
     session_id: string | null;
     summary: string | null;
     created_at: string;
@@ -22,6 +27,7 @@ export interface Task {
 
 export interface TaskConfig {
     prompt: string;
+    agent_id: string;
     working_directory?: string;
     model_id?: string;
 }
@@ -43,11 +49,54 @@ export interface TaskResult {
 export interface AppSettings {
     debug_mode: boolean;
     theme: 'light' | 'dark' | 'system';
+    default_agent_id: string;
     claude_model: string | null;
     claude_permission_mode: string;
     claude_cli_path: string | null;
     workspace_dir: string;
     sandbox_mode: 'strict' | 'fallback';
+}
+
+export interface AgentCapabilities {
+    structured_streaming: boolean;
+    session_create: boolean;
+    session_resume: boolean;
+    session_fork: boolean;
+    tool_events: boolean;
+    approvals: boolean;
+    questions: boolean;
+    plan_updates: boolean;
+    attachments: boolean;
+    attachment_types: string[];
+    model_discovery: boolean;
+    mode_discovery: boolean;
+    usage: boolean;
+    native_sandbox: boolean;
+    external_sandbox: 'verified' | 'partial' | 'unsupported' | 'unknown';
+    cancellation: boolean;
+}
+
+export interface AgentStatus {
+    agent_id: string;
+    display_name: string;
+    adapter_id: string;
+    adapter_version: string;
+    protocol: string;
+    install_url: string | null;
+    documentation_url: string | null;
+    installed: boolean;
+    executable_path: string | null;
+    version: string | null;
+    compatible: boolean | null;
+    auth_status: 'not_checked' | 'ready' | 'action_required' | 'unknown' | 'error';
+    detail: string | null;
+    checked_at: string;
+    capabilities: AgentCapabilities;
+}
+
+export interface AgentListResponse {
+    default_agent_id: string;
+    agents: AgentStatus[];
 }
 
 export interface EngineStatus {
@@ -152,6 +201,8 @@ export const api = {
 
     getEngineStatus: (probeAuth = false) =>
         apiFetch<EngineStatus>(`/engine/status?probe_auth=${probeAuth ? 'true' : 'false'}`),
+    listAgents: (refresh = false) =>
+        apiFetch<AgentListResponse>(`/agents?refresh=${refresh ? 'true' : 'false'}`),
 
     getWorkspace: () => apiFetch<{ workspace: string; path: string }>('/files/workspace'),
     listFiles: (path = '.') => apiFetch<FileListResponse>(`/files/list?path=${encodeURIComponent(path)}`),
@@ -273,8 +324,8 @@ class SwiftAgentWS {
         this.send('question:response', { request_id: requestId, answer });
     }
 
-    resumeSession(sessionId: string, prompt: string) {
-        this.send('session:resume', { session_id: sessionId, prompt });
+    resumeSession(sessionId: string, prompt: string, agentId: string) {
+        this.send('session:resume', { session_id: sessionId, prompt, agent_id: agentId });
     }
 
     private _dispatch(event: WSEvent) {

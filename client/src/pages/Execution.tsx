@@ -11,6 +11,7 @@ import {
 import { AnimatePresence, motion } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import AgentBadge from '../components/agents/AgentBadge';
 import PermissionDialog, { type PermissionPayload } from '../components/execution/PermissionDialog';
 import { api, type Task, type TaskMessage, type WSEvent, ws } from '../lib/swiftagent';
 import { toast } from '../lib/toast';
@@ -52,10 +53,10 @@ function statusProgress(status: string): string {
     return '';
 }
 
-function stageLabel(stage?: string, fallback?: string): string {
+function stageLabel(agentName: string, stage?: string, fallback?: string): string {
     if (fallback && fallback.trim()) return fallback;
     if (!stage) return 'Running...';
-    if (stage === 'starting') return 'Starting Claude...';
+    if (stage === 'starting') return `Starting ${agentName}...`;
     return stage;
 }
 
@@ -71,6 +72,7 @@ export default function Execution() {
     const [reply, setReply] = useState('');
     const [sendingReply, setSendingReply] = useState(false);
     const [pendingRequest, setPendingRequest] = useState<PendingRequest | null>(null);
+    const [agentName, setAgentName] = useState('Coding agent');
 
     const eventKeysRef = useRef<Set<string>>(new Set());
     const scrollRef = useRef<HTMLDivElement>(null);
@@ -89,13 +91,20 @@ export default function Execution() {
             eventKeysRef.current.clear();
 
             try {
-                const loadedTask = await api.getTask(taskId);
+                const [loadedTask, catalog] = await Promise.all([
+                    api.getTask(taskId),
+                    api.listAgents().catch(() => null),
+                ]);
                 if (cancelled) return;
                 if (!loadedTask) {
                     throw new Error('Task not found');
                 }
 
                 setTask(loadedTask);
+                setAgentName(
+                    catalog?.agents.find((agent) => agent.agent_id === loadedTask.agent_id)?.display_name ||
+                        loadedTask.agent_id,
+                );
                 setMessages(loadedTask.messages ?? []);
                 setStatus(loadedTask.status as TaskViewStatus);
                 setProgress(statusProgress(loadedTask.status));
@@ -143,7 +152,7 @@ export default function Execution() {
                 if (payload.stage === 'starting') {
                     setStatus('running');
                 }
-                setProgress(stageLabel(payload.stage, payload.message));
+                setProgress(stageLabel(agentName, payload.stage, payload.message));
             })
         );
 
@@ -163,7 +172,7 @@ export default function Execution() {
                     },
                 ]);
                 if (role === 'assistant') {
-                    setProgress('Claude is responding...');
+                    setProgress(`${agentName} is responding...`);
                 }
                 setStatus((prev) => (prev === 'completed' || prev === 'failed' || prev === 'cancelled' ? prev : 'running'));
                 setSendingReply(false);
@@ -299,7 +308,7 @@ export default function Execution() {
                 followUpTimeoutRef.current = null;
             }
         };
-    }, [navigate, taskId]);
+    }, [agentName, navigate, taskId]);
 
     useEffect(() => {
         scrollRef.current?.scrollTo({
@@ -324,7 +333,7 @@ export default function Execution() {
         setStatus('running');
         setProgress('Starting follow-up...');
         followUpSessionRef.current = sessionId;
-        ws.resumeSession(sessionId, text);
+        ws.resumeSession(sessionId, text, task?.agent_id || task?.config.agent_id);
         if (followUpTimeoutRef.current) {
             window.clearTimeout(followUpTimeoutRef.current);
         }
@@ -345,13 +354,15 @@ export default function Execution() {
         }
         setPendingRequest(null);
         setStatus('running');
-        setProgress('Waiting for Claude...');
+        setProgress(`Waiting for ${agentName}...`);
     };
 
     const isRunning = isActiveStatus(status);
     const isCompleted = status === 'completed';
     const isFailed = status === 'failed' || status === 'cancelled';
-    const canReply = Boolean(task?.session_id) && !isRunning && !sendingReply;
+    const canReply = Boolean(
+        task?.session_id && task.capability_snapshot?.session_resume !== false,
+    ) && !isRunning && !sendingReply;
     const showTypingIndicator = isRunning && !pendingRequest && !loadingTask;
 
     return (
@@ -366,9 +377,17 @@ export default function Execution() {
                 </button>
 
                 <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-foreground truncate">
-                        {task?.config.prompt || 'Task execution'}
-                    </p>
+                    <div className="flex min-w-0 items-center gap-2">
+                        <p className="truncate text-sm font-medium text-foreground">
+                            {task?.config.prompt || 'Task execution'}
+                        </p>
+                        <AgentBadge name={agentName} className="hidden shrink-0 sm:inline-flex" />
+                        {task?.capability_snapshot?.effective_sandbox_mode ? (
+                            <span className="hidden shrink-0 rounded-full border border-border px-2 py-1 text-[10px] text-muted-foreground md:inline-flex">
+                                {String(task.capability_snapshot.effective_sandbox_mode)} safety
+                            </span>
+                        ) : null}
+                    </div>
                     <p className="text-xs text-muted-foreground flex items-center gap-1.5">
                         {isRunning ? (
                             <>

@@ -6,10 +6,11 @@ from collections.abc import Callable
 from typing import Any
 
 from swiftagent.agents.base import AgentAdapter
-from swiftagent.models.agent import AgentCapabilities, AgentDefinition
+from swiftagent.models.agent import AgentCapabilities, AgentDefinition, AgentStatus
 from swiftagent.models.task import Task
 
 AdapterFactory = Callable[[Task, Any], AgentAdapter]
+StatusProvider = Callable[[AgentDefinition], AgentStatus]
 
 
 class AgentRegistry:
@@ -18,12 +19,21 @@ class AgentRegistry:
     def __init__(self) -> None:
         self._definitions: dict[str, AgentDefinition] = {}
         self._factories: dict[str, AdapterFactory] = {}
+        self._status_providers: dict[str, StatusProvider] = {}
+        self._status_cache: dict[str, AgentStatus] = {}
 
-    def register(self, definition: AgentDefinition, factory: AdapterFactory) -> None:
+    def register(
+        self,
+        definition: AgentDefinition,
+        factory: AdapterFactory,
+        status_provider: StatusProvider | None = None,
+    ) -> None:
         if definition.agent_id in self._definitions:
             raise ValueError(f"Agent is already registered: {definition.agent_id}")
         self._definitions[definition.agent_id] = definition
         self._factories[definition.agent_id] = factory
+        if status_provider:
+            self._status_providers[definition.agent_id] = status_provider
 
     def definition(self, agent_id: str) -> AgentDefinition:
         try:
@@ -39,12 +49,40 @@ class AgentRegistry:
     def definitions(self) -> list[AgentDefinition]:
         return [self._definitions[key] for key in sorted(self._definitions)]
 
+    def statuses(self, *, refresh: bool = False) -> list[AgentStatus]:
+        statuses: list[AgentStatus] = []
+        for definition in self.definitions():
+            provider = self._status_providers.get(definition.agent_id)
+            if not refresh and definition.agent_id in self._status_cache:
+                statuses.append(self._status_cache[definition.agent_id])
+                continue
+            if provider:
+                status = provider(definition)
+                self._status_cache[definition.agent_id] = status
+                statuses.append(status)
+                continue
+            status = AgentStatus(
+                **definition.model_dump(),
+                installed=True,
+                compatible=None,
+                detail="No discovery probe is registered for this adapter.",
+            )
+            self._status_cache[definition.agent_id] = status
+            statuses.append(status)
+        return statuses
+
 
 def _create_claude_adapter(task: Task, manager: Any) -> AgentAdapter:
     # Lazy import keeps the registry independent from concrete adapter modules.
     from swiftagent.agents.claude import ClaudeCodeAdapter
 
     return ClaudeCodeAdapter(task, manager)
+
+
+def _get_claude_status(definition: AgentDefinition) -> AgentStatus:
+    from swiftagent.agents.claude.status import get_status
+
+    return get_status(definition)
 
 
 agent_registry = AgentRegistry()
@@ -55,6 +93,8 @@ agent_registry.register(
         adapter_id="claude-stream-json",
         adapter_version="0.3.0",
         protocol="stream-json",
+        install_url="https://docs.anthropic.com/en/docs/claude-code/setup",
+        documentation_url="https://docs.anthropic.com/en/docs/claude-code/overview",
         capabilities=AgentCapabilities(
             structured_streaming=True,
             session_resume=True,
@@ -68,4 +108,5 @@ agent_registry.register(
         ),
     ),
     _create_claude_adapter,
+    _get_claude_status,
 )

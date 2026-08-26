@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING
 from swiftagent.agents.base import AgentAdapter
 from swiftagent.agents.registry import AgentRegistry, agent_registry
 from swiftagent.models.task import Task, TaskConfig, TaskMessage, TaskStatus
+from swiftagent.storage import settings as settings_repo
 from swiftagent.storage import tasks as task_repo
 from swiftagent.tools.workspace import WorkspacePathError, resolve_workspace_path
 
@@ -49,7 +50,10 @@ class TaskManager:
             adapter_id=definition.adapter_id,
             adapter_version=definition.adapter_version,
             native_session_id=session_id,
-            capability_snapshot=definition.capabilities.model_dump(),
+            capability_snapshot={
+                **definition.capabilities.model_dump(),
+                "effective_sandbox_mode": settings_repo.get_sandbox_mode(),
+            },
             session_id=session_id,
         )
 

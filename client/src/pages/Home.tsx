@@ -1,22 +1,67 @@
-import { useState, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router';
-import { PaperPlaneRight, Sparkle, CircleNotch } from '@phosphor-icons/react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { ws } from '../lib/swiftagent';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useNavigate } from 'react-router';
+import {
+    CaretDown,
+    CircleNotch,
+    FolderOpen,
+    PaperPlaneRight,
+    ShieldCheck,
+    SlidersHorizontal,
+    Sparkle,
+    WarningCircle,
+} from '@phosphor-icons/react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { api, type AgentStatus, type AppSettings, ws } from '../lib/swiftagent';
 import { toast } from '../lib/toast';
 
 export default function Home() {
     const [prompt, setPrompt] = useState('');
     const [loading, setLoading] = useState(false);
+    const [loadingAgents, setLoadingAgents] = useState(true);
+    const [agents, setAgents] = useState<AgentStatus[]>([]);
+    const [settings, setSettings] = useState<AppSettings | null>(null);
+    const [agentId, setAgentId] = useState('');
+    const [workingDirectory, setWorkingDirectory] = useState('.');
+    const [modelId, setModelId] = useState('');
+    const [showOptions, setShowOptions] = useState(false);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const startTimeoutRef = useRef<number | null>(null);
     const navigate = useNavigate();
 
+    const selectedAgent = useMemo(
+        () => agents.find((agent) => agent.agent_id === agentId) ?? null,
+        [agentId, agents],
+    );
+    const agentReady = Boolean(selectedAgent?.installed && selectedAgent.compatible !== false);
+
     useEffect(() => {
         textareaRef.current?.focus();
+        let cancelled = false;
+        Promise.all([api.listAgents(), api.getSettings()])
+            .then(([catalog, currentSettings]) => {
+                if (cancelled) return;
+                setAgents(catalog.agents);
+                setSettings(currentSettings);
+                const preferred = catalog.agents.find(
+                    (agent) =>
+                        agent.agent_id === currentSettings.default_agent_id &&
+                        agent.installed &&
+                        agent.compatible !== false,
+                );
+                const firstReady = catalog.agents.find(
+                    (agent) => agent.installed && agent.compatible !== false,
+                );
+                setAgentId((preferred ?? firstReady ?? catalog.agents[0])?.agent_id ?? '');
+            })
+            .catch((error: Error) => toast.error('Could not load agents', error.message))
+            .finally(() => {
+                if (!cancelled) setLoadingAgents(false);
+            });
+        return () => {
+            cancelled = true;
+        };
     }, []);
 
-    // Listen for task:started to navigate to execution page
     useEffect(() => {
         const unsubStarted = ws.on('task:started', (event) => {
             const taskId = event.task_id || (event.payload as { id?: string })?.id;
@@ -30,9 +75,7 @@ export default function Home() {
             }
         });
         const unsubError = ws.on('task:error', (event) => {
-            if (event.task_id) {
-                return;
-            }
+            if (event.task_id) return;
             const payload = event.payload as { error?: string };
             setLoading(false);
             toast.error('Failed to start task', payload.error || 'Unknown error');
@@ -40,117 +83,183 @@ export default function Home() {
         return () => {
             unsubStarted();
             unsubError();
-            if (startTimeoutRef.current) {
-                window.clearTimeout(startTimeoutRef.current);
-                startTimeoutRef.current = null;
-            }
+            if (startTimeoutRef.current) window.clearTimeout(startTimeoutRef.current);
         };
     }, [navigate]);
 
-    const handleSubmit = async () => {
+    const handleSubmit = () => {
         const trimmed = prompt.trim();
-        if (!trimmed || loading) return;
+        if (!trimmed || loading || !selectedAgent || !agentReady) return;
 
         setLoading(true);
-        ws.startTask({ prompt: trimmed });
-        if (startTimeoutRef.current) {
-            window.clearTimeout(startTimeoutRef.current);
-        }
+        ws.startTask({
+            prompt: trimmed,
+            agent_id: selectedAgent.agent_id,
+            working_directory: workingDirectory.trim() || undefined,
+            model_id: modelId.trim() || undefined,
+        });
+        if (startTimeoutRef.current) window.clearTimeout(startTimeoutRef.current);
         startTimeoutRef.current = window.setTimeout(() => {
             setLoading(false);
-            toast.error('Task start timed out', 'No response from server. Check backend and WebSocket connection.');
+            toast.error('Task start timed out', 'No response from the local SwiftAgent server.');
         }, 15000);
     };
 
-    const handleKeyDown = (e: React.KeyboardEvent) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            handleSubmit();
-        }
-    };
-
-    // Auto-resize textarea
     const handleInput = () => {
-        const el = textareaRef.current;
-        if (el) {
-            el.style.height = 'auto';
-            el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
-        }
+        const element = textareaRef.current;
+        if (!element) return;
+        element.style.height = 'auto';
+        element.style.height = `${Math.min(element.scrollHeight, 240)}px`;
     };
 
     return (
-        <div className="flex-1 flex flex-col items-center justify-center px-6">
-            <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, ease: 'easeOut' }}
-                className="w-full max-w-2xl space-y-6"
-            >
-                {/* Header */}
-                <div className="text-center space-y-2">
-                    <div className="flex items-center justify-center gap-2">
-                        <Sparkle weight="fill" className="w-6 h-6 text-primary" />
-                        <h1 className="text-2xl font-semibold text-foreground">
-                            SwiftAgent
-                        </h1>
-                    </div>
-                    <p className="text-muted-foreground text-sm">
-                        Describe a task and let the AI handle it for you.
-                    </p>
-                </div>
+        <div className="relative flex flex-1 flex-col items-center justify-center overflow-y-auto px-4 py-10 sm:px-8">
+            <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
+                <div className="absolute left-1/2 top-1/3 h-96 w-96 -translate-x-1/2 rounded-full bg-primary/[0.055] blur-3xl" />
+            </div>
 
-                {/* Input area */}
-                <div className="relative group">
-                    <div className="rounded-2xl border border-border bg-card shadow-sm transition-shadow group-focus-within:shadow-md group-focus-within:border-primary/30">
+            <motion.div
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.45, ease: 'easeOut' }}
+                className="relative w-full max-w-3xl space-y-7"
+            >
+                <header className="space-y-3 text-center">
+                    <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-2xl border border-primary/20 bg-primary/10 text-primary">
+                        <Sparkle weight="fill" className="h-5 w-5" />
+                    </div>
+                    <div>
+                        <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+                            One workspace. Your choice of agent.
+                        </h1>
+                        <p className="mx-auto mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
+                            Delegate locally, follow every tool call, and keep a durable history you control.
+                        </p>
+                    </div>
+                </header>
+
+                <section className="overflow-hidden rounded-3xl border border-border bg-card shadow-[0_24px_80px_-48px_hsl(var(--foreground))]">
+                    <div className="flex flex-col gap-3 border-b border-border bg-muted/30 px-4 py-3 sm:flex-row sm:items-center">
+                        <label className="relative min-w-0 flex-1">
+                            <span className="sr-only">Coding agent</span>
+                            <select
+                                value={agentId}
+                                onChange={(event) => setAgentId(event.target.value)}
+                                disabled={loadingAgents || agents.length === 0}
+                                className="h-10 w-full appearance-none rounded-xl border border-border bg-background pl-3 pr-9 text-sm font-medium text-foreground outline-none transition focus:border-primary/50 focus:ring-2 focus:ring-primary/10 disabled:opacity-50"
+                            >
+                                {agents.map((agent) => (
+                                    <option key={agent.agent_id} value={agent.agent_id}>
+                                        {agent.display_name} · {!agent.installed ? 'missing' : agent.compatible === false ? 'attention required' : 'ready'}
+                                    </option>
+                                ))}
+                            </select>
+                            <CaretDown className="pointer-events-none absolute right-3 top-3 h-4 w-4 text-muted-foreground" />
+                        </label>
+
+                        <div className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground sm:max-w-[46%]">
+                            <FolderOpen className="h-4 w-4 shrink-0" />
+                            <span className="truncate" title={settings?.workspace_dir}>
+                                {settings?.workspace_dir || 'Loading workspace…'}
+                            </span>
+                        </div>
+                    </div>
+
+                    <div className="relative">
                         <textarea
                             ref={textareaRef}
                             value={prompt}
-                            onChange={(e) => {
-                                setPrompt(e.target.value);
+                            onChange={(event) => {
+                                setPrompt(event.target.value);
                                 handleInput();
                             }}
-                            onKeyDown={handleKeyDown}
-                            placeholder="What would you like me to do?"
-                            className="w-full resize-none bg-transparent px-5 pt-4 pb-14 text-foreground placeholder:text-muted-foreground/60 focus:outline-none text-[15px] leading-relaxed min-h-[56px] max-h-[200px]"
-                            rows={1}
+                            onKeyDown={(event) => {
+                                if (event.key === 'Enter' && !event.shiftKey) {
+                                    event.preventDefault();
+                                    handleSubmit();
+                                }
+                            }}
+                            placeholder="Describe the outcome you want…"
+                            className="min-h-36 max-h-60 w-full resize-none bg-transparent px-5 pb-16 pt-5 text-[15px] leading-relaxed text-foreground outline-none placeholder:text-muted-foreground/60"
                             disabled={loading}
+                            rows={4}
                         />
 
-                        {/* Bottom bar */}
-                        <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between">
-                            <span className="text-xs text-muted-foreground/50">
-                                {prompt.length > 0 ? `${prompt.length} chars` : 'Shift+Enter for new line'}
-                            </span>
+                        <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between gap-3">
+                            <button
+                                type="button"
+                                onClick={() => setShowOptions((visible) => !visible)}
+                                className="inline-flex h-9 items-center gap-2 rounded-xl px-3 text-xs font-medium text-muted-foreground transition hover:bg-accent hover:text-foreground"
+                                aria-expanded={showOptions}
+                            >
+                                <SlidersHorizontal className="h-4 w-4" />
+                                Run options
+                            </button>
 
                             <button
+                                type="button"
                                 onClick={handleSubmit}
-                                disabled={!prompt.trim() || loading}
-                                className="h-8 w-8 rounded-lg bg-primary text-primary-foreground flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed hover:bg-primary/90 transition-colors"
+                                disabled={!prompt.trim() || loading || !agentReady}
+                                className="inline-flex h-10 items-center gap-2 rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40"
                             >
-                                <AnimatePresence mode="wait">
-                                    {loading ? (
-                                        <motion.div
-                                            key="loading"
-                                            initial={{ opacity: 0, rotate: 0 }}
-                                            animate={{ opacity: 1, rotate: 360 }}
-                                            transition={{ rotate: { duration: 1, repeat: Infinity, ease: 'linear' } }}
-                                        >
-                                            <CircleNotch weight="bold" className="w-4 h-4" />
-                                        </motion.div>
-                                    ) : (
-                                        <motion.div
-                                            key="send"
-                                            initial={{ opacity: 0, scale: 0.8 }}
-                                            animate={{ opacity: 1, scale: 1 }}
-                                        >
-                                            <PaperPlaneRight weight="fill" className="w-4 h-4" />
-                                        </motion.div>
-                                    )}
-                                </AnimatePresence>
+                                {loading ? <CircleNotch weight="bold" className="h-4 w-4 animate-spin" /> : <PaperPlaneRight weight="fill" className="h-4 w-4" />}
+                                Run
                             </button>
                         </div>
                     </div>
-                </div>
+
+                    <AnimatePresence initial={false}>
+                        {showOptions ? (
+                            <motion.div
+                                initial={{ height: 0, opacity: 0 }}
+                                animate={{ height: 'auto', opacity: 1 }}
+                                exit={{ height: 0, opacity: 0 }}
+                                className="overflow-hidden border-t border-border"
+                            >
+                                <div className="grid gap-4 bg-muted/20 p-4 sm:grid-cols-2">
+                                    <label className="space-y-1.5">
+                                        <span className="text-xs font-medium text-foreground">Directory inside workspace</span>
+                                        <input
+                                            value={workingDirectory}
+                                            onChange={(event) => setWorkingDirectory(event.target.value)}
+                                            placeholder="."
+                                            className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/10"
+                                        />
+                                    </label>
+                                    {selectedAgent?.capabilities.model_discovery ? (
+                                        <label className="space-y-1.5">
+                                            <span className="text-xs font-medium text-foreground">Model</span>
+                                            <input
+                                                value={modelId}
+                                                onChange={(event) => setModelId(event.target.value)}
+                                                placeholder="Agent default"
+                                                className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/10"
+                                            />
+                                        </label>
+                                    ) : null}
+                                </div>
+                            </motion.div>
+                        ) : null}
+                    </AnimatePresence>
+                </section>
+
+                {selectedAgent ? (
+                    <div className="flex flex-col justify-between gap-3 px-1 text-xs text-muted-foreground sm:flex-row sm:items-center">
+                        <span className="inline-flex items-center gap-2">
+                            {agentReady ? <ShieldCheck className="h-4 w-4 text-emerald-600" /> : <WarningCircle className="h-4 w-4 text-amber-600" />}
+                            {agentReady
+                                ? `${selectedAgent.display_name} · ${settings?.sandbox_mode === 'strict' ? 'strict isolation requested' : 'trusted local fallback'}`
+                                : selectedAgent.detail || 'This agent is not ready to run.'}
+                        </span>
+                        <Link to="/settings" className="shrink-0 font-medium text-primary hover:underline">
+                            Manage agents
+                        </Link>
+                    </div>
+                ) : (
+                    <p className="text-center text-xs text-muted-foreground">
+                        No runnable adapter is configured. Open Your agents to connect one.
+                    </p>
+                )}
             </motion.div>
         </div>
     );

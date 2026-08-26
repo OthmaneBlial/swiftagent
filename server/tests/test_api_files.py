@@ -1,5 +1,23 @@
 from __future__ import annotations
 
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+
+from swiftagent.main import SPAStaticFiles
+
+
+def test_spa_routes_fallback_to_the_client_entry_point(tmp_path):
+    dist = tmp_path / "dist"
+    dist.mkdir()
+    (dist / "index.html").write_text("<main>SwiftAgent</main>", encoding="utf-8")
+
+    static_app = FastAPI()
+    static_app.mount("/", SPAStaticFiles(directory=str(dist), html=True))
+
+    with TestClient(static_app) as static_client:
+        assert static_client.get("/settings").text == "<main>SwiftAgent</main>"
+        assert static_client.get("/assets/missing.js").status_code == 404
+
 
 def test_health_and_readiness_expose_a_request_id(client):
     health = client.get("/health")

@@ -18,6 +18,7 @@ import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from swiftagent.api.routes import router as api_router
 from swiftagent.api.websocket import router as ws_router
@@ -26,7 +27,7 @@ from swiftagent.storage import settings as settings_repo
 from swiftagent.storage.database import close_database, init_database
 
 logger = logging.getLogger(__name__)
-VERSION = "0.2.0"
+VERSION = "0.2.1"
 
 
 def _configure_logging() -> None:
@@ -143,10 +144,14 @@ class SPAStaticFiles(StaticFiles):
     """Serve the SPA entry point for client-side routes in production."""
 
     async def get_response(self, path: str, scope):  # type: ignore[no-untyped-def]
-        response = await super().get_response(path, scope)
-        if response.status_code == 404:
-            return await super().get_response("index.html", scope)
-        return response
+        try:
+            return await super().get_response(path, scope)
+        except StarletteHTTPException as exc:
+            # Let broken asset URLs remain a real 404. Client-side routes such as
+            # /settings need the SPA shell so refreshing them stays functional.
+            if exc.status_code == 404 and not Path(path).suffix:
+                return await super().get_response("index.html", scope)
+            raise
 
 
 if _client_dist.is_dir():

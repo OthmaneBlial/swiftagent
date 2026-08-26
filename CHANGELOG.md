@@ -2,6 +2,10 @@
 
 All notable changes are documented here. This project follows semantic versioning for public releases.
 
+## 0.2.1 — 2026-08-26
+
+- Fix production SPA refreshes so client-side routes such as `/settings` serve the app entry point while missing static assets remain 404s.
+
 ## 0.2.0 — 2026-08-26
 
 - Fail closed when strict bwrap sandboxing is unavailable instead of silently running unsandboxed.

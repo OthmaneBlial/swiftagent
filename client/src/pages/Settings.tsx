@@ -20,6 +20,7 @@ export default function Settings() {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
+    const [testingGeneric, setTestingGeneric] = useState(false);
 
     useEffect(() => {
         let cancelled = false;
@@ -73,6 +74,28 @@ export default function Settings() {
             toast.error('Detection failed', (error as Error).message);
         } finally {
             setRefreshing(false);
+        }
+    };
+
+    const testGenericCommand = async () => {
+        if (!settings) return;
+        setTestingGeneric(true);
+        try {
+            const updated = await api.updateSettings({
+                generic_command_manifest_json: settings.generic_command_manifest_json,
+            });
+            setSettings(updated);
+            const result = await api.testGenericCommand();
+            const catalog = await api.listAgents(true);
+            setAgents(catalog.agents);
+            toast.success(
+                'Disposable adapter test passed',
+                result.version_output || 'Prompt transport and exact marker verified.',
+            );
+        } catch (error) {
+            toast.error('Disposable adapter test failed', (error as Error).message);
+        } finally {
+            setTestingGeneric(false);
         }
     };
 
@@ -361,6 +384,43 @@ export default function Settings() {
                         <p className="mt-3 text-[11px] leading-relaxed text-muted-foreground">
                             Models come from <code>opencode models</code>. SwiftAgent prefers ACP, never enables session sharing, and labels the reduced JSON fallback when ACP is unavailable. Provider login remains owned by <code>opencode auth login</code>.
                         </p>
+                    </details>
+                ) : null}
+
+                {agents.some((agent) => agent.agent_id === 'generic-command') ? (
+                    <details className="rounded-2xl border border-border bg-card p-5">
+                        <summary className="cursor-pointer text-sm font-semibold text-foreground">Generic command adapter</summary>
+                        <div className="mt-4 space-y-3">
+                            <label className="block space-y-1.5">
+                                <span className="text-xs text-muted-foreground">Reviewed manifest JSON</span>
+                                <textarea
+                                    value={settings.generic_command_manifest_json}
+                                    onChange={(event) => update('generic_command_manifest_json', event.target.value)}
+                                    rows={14}
+                                    spellCheck={false}
+                                    placeholder={'{\n  "schema_version": 1,\n  "name": "My text agent",\n  "executable": "/absolute/path/to/agent",\n  "arguments": [],\n  "prompt_transport": "stdin",\n  "cwd_mode": "task",\n  "timeout_seconds": 300,\n  "environment_allowlist": ["PATH", "LANG"]\n}'}
+                                    className="w-full resize-y rounded-xl border border-border bg-background p-3 font-mono text-xs leading-relaxed outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/10"
+                                />
+                            </label>
+                            <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
+                                <p className="max-w-2xl text-[11px] leading-relaxed text-muted-foreground">
+                                    SwiftAgent never invokes a shell. Saving a changed manifest disables this adapter until the exact executable and prompt transport pass in a disposable workspace. Rich tools, approvals, resume, attachments, and usage remain unsupported.
+                                </p>
+                                <button
+                                    type="button"
+                                    onClick={testGenericCommand}
+                                    disabled={testingGeneric || !settings.generic_command_manifest_json.trim()}
+                                    className="h-9 shrink-0 rounded-xl border border-border bg-background px-3 text-xs font-medium text-foreground transition hover:bg-accent disabled:opacity-50"
+                                >
+                                    {testingGeneric ? 'Testing…' : 'Run disposable test'}
+                                </button>
+                            </div>
+                            {settings.sandbox_mode === 'fallback' ? (
+                                <p role="alert" className="rounded-xl border border-amber-500/35 bg-amber-500/10 p-3 text-xs leading-relaxed text-amber-800 dark:text-amber-200">
+                                    Fallback mode is active. The disposable directory limits the test working directory, but the command still has your local user permissions outside it.
+                                </p>
+                            ) : null}
+                        </div>
                     </details>
                 ) : null}
 

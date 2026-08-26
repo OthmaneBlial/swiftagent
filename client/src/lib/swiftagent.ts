@@ -61,6 +61,7 @@ export interface AppSettings {
     codex_allow_dangerous_bypass: boolean;
     opencode_model: string | null;
     opencode_cli_path: string | null;
+    generic_command_manifest_json: string;
     workspace_dir: string;
     sandbox_mode: 'strict' | 'fallback';
 }
@@ -110,6 +111,15 @@ export interface AgentStatus {
 export interface AgentListResponse {
     default_agent_id: string;
     agents: AgentStatus[];
+}
+
+export interface GenericCommandTestResult {
+    success: boolean;
+    stdout: string;
+    stderr: string;
+    version_output: string | null;
+    sandbox_notice: string | null;
+    tested_at: string;
 }
 
 export interface EngineStatus {
@@ -216,6 +226,8 @@ export const api = {
         apiFetch<EngineStatus>(`/engine/status?probe_auth=${probeAuth ? 'true' : 'false'}`),
     listAgents: (refresh = false) =>
         apiFetch<AgentListResponse>(`/agents?refresh=${refresh ? 'true' : 'false'}`),
+    testGenericCommand: () =>
+        apiFetch<GenericCommandTestResult>('/agents/generic-command/test', { method: 'POST' }),
 
     getWorkspace: () => apiFetch<{ workspace: string; path: string }>('/files/workspace'),
     listFiles: (path = '.') => apiFetch<FileListResponse>(`/files/list?path=${encodeURIComponent(path)}`),

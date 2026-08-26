@@ -114,7 +114,7 @@ FastAPI ── Task manager ── Agent registry ── selected local adapter
    └── SQLite history/settings and workspace-scoped file API
 ```
 
-More detail: [architecture](docs/ARCHITECTURE.md) · [ACP adapter](docs/ACP_ADAPTER.md) · [Codex adapter](docs/CODEX_ADAPTER.md) · [OpenCode adapter](docs/OPENCODE_ADAPTER.md) · [demo capture guide](docs/DEMO.md).
+More detail: [architecture](docs/ARCHITECTURE.md) · [ACP adapter](docs/ACP_ADAPTER.md) · [Codex adapter](docs/CODEX_ADAPTER.md) · [OpenCode adapter](docs/OPENCODE_ADAPTER.md) · [generic command adapter](docs/GENERIC_COMMAND_ADAPTER.md) · [demo capture guide](docs/DEMO.md).
 
 ## Quality checks
 
@@ -128,7 +128,7 @@ The server regression suite covers adapter contracts, capability combinations, l
 
 ## Adapter availability
 
-The v0.3 release ships the migrated Claude Code adapter and the agent-neutral extension boundary. The in-development v0.4 line now includes tested local ACP v1, native Codex app-server, and ACP-first OpenCode adapters; inspect their readiness, discovered models, transport, and effective capabilities in **Your agents**. A conservative generic-command adapter remains tracked in [ROADMAP.md](ROADMAP.md) and is not presented as working until its own fixtures and live matrix pass.
+The v0.3 release ships the migrated Claude Code adapter and the agent-neutral extension boundary. The in-development v0.4 line now includes tested local ACP v1, native Codex app-server, ACP-first OpenCode, and restricted generic-command adapters. Inspect their readiness, discovered models, transport, and effective capabilities in **Your agents**; the generic adapter remains disabled until its disposable test passes.
 
 ## Contributing and release notes
 

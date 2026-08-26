@@ -4,6 +4,8 @@ All notable changes are documented here. This project follows semantic versionin
 
 ## Unreleased
 
+- Add a text-only generic-command adapter with a reviewed schema-v1 manifest, literal argv/stdin transport, environment allowlist, bounded output/timeout, process-group cleanup, and no shell interpolation.
+- Require a matching disposable-workspace test receipt before a generic command can run real tasks; manifest or executable changes disable it automatically.
 - Add an ACP-first OpenCode 1.18 adapter with version/transport detection, CLI-owned model discovery, native resume, explicit model configuration, and no automatic session sharing.
 - Add a clearly reduced OpenCode JSON-run fallback with bounded parsing, tool/usage mapping, process-group cancellation, and no interactive approvals, plans, questions, auto-approval, or sharing.
 - Add a native Codex app-server v2 adapter with free readiness/auth probes, thread start/resume, model discovery, streamed items, approvals, questions, plan/usage mapping, native safety profiles, interruption, and process cleanup.

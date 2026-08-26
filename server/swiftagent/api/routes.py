@@ -13,6 +13,8 @@ from pydantic import BaseModel, Field
 
 from swiftagent.agents.acp import settings as acp_settings
 from swiftagent.agents.codex import settings as codex_settings
+from swiftagent.agents.generic_command import settings as generic_command_settings
+from swiftagent.agents.generic_command.tester import run_disposable_test
 from swiftagent.agents.opencode import settings as opencode_settings
 from swiftagent.agents.registry import agent_registry
 from swiftagent.models.settings import AppSettings
@@ -93,6 +95,7 @@ class SettingsUpdate(BaseModel):
     codex_allow_dangerous_bypass: bool | None = None
     opencode_model: str | None = Field(default=None, max_length=256)
     opencode_cli_path: str | None = Field(default=None, max_length=4_096)
+    generic_command_manifest_json: str | None = Field(default=None, max_length=65_536)
     workspace_dir: str | None = Field(default=None, max_length=4_096)
     sandbox_mode: Literal["strict", "fallback"] | None = None
 
@@ -158,6 +161,11 @@ async def update_settings(update: SettingsUpdate):
         opencode_settings.set_model(update.opencode_model or None)
     if update.opencode_cli_path is not None:
         opencode_settings.set_cli_path(update.opencode_cli_path or None)
+    if update.generic_command_manifest_json is not None:
+        try:
+            generic_command_settings.set_manifest_json(update.generic_command_manifest_json)
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
     if update.workspace_dir is not None:
         raw_workspace = update.workspace_dir.strip()
         if not raw_workspace:
@@ -188,6 +196,14 @@ async def list_agents(refresh: bool = Query(default=False)):
         "default_agent_id": settings_repo.get_default_agent_id(),
         "agents": agent_registry.statuses(refresh=refresh),
     }
+
+
+@router.post("/agents/generic-command/test")
+async def test_generic_command_adapter():
+    try:
+        return await run_disposable_test()
+    except (OSError, RuntimeError, ValueError) as exc:
+        raise HTTPException(400, str(exc)) from exc
 
 
 @router.get("/engine/status")

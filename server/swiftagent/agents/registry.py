@@ -121,6 +121,18 @@ def _get_opencode_status(definition: AgentDefinition) -> AgentStatus:
     return get_status(definition)
 
 
+def _create_generic_command_adapter(task: Task, manager: Any) -> AgentAdapter:
+    from swiftagent.agents.generic_command import GenericCommandAdapter
+
+    return GenericCommandAdapter(task, manager)
+
+
+def _get_generic_command_status(definition: AgentDefinition) -> AgentStatus:
+    from swiftagent.agents.generic_command.status import get_status
+
+    return get_status(definition)
+
+
 agent_registry = AgentRegistry()
 agent_registry.register(
     AgentDefinition(
@@ -225,4 +237,33 @@ agent_registry.register(
     ),
     _create_opencode_adapter,
     _get_opencode_status,
+)
+agent_registry.register(
+    AgentDefinition(
+        agent_id="generic-command",
+        display_name="Generic command",
+        adapter_id="literal-subprocess-v1",
+        adapter_version="0.4.0",
+        protocol="literal-subprocess",
+        documentation_url=(
+            "https://github.com/OthmaneBlial/swiftagent/blob/main/docs/GENERIC_COMMAND_ADAPTER.md"
+        ),
+        capabilities=AgentCapabilities(
+            structured_streaming=False,
+            session_resume=False,
+            session_fork=False,
+            tool_events=False,
+            approvals=False,
+            questions=False,
+            plan_updates=False,
+            attachments=False,
+            model_discovery=False,
+            mode_discovery=False,
+            usage=False,
+            native_sandbox=False,
+            external_sandbox="partial",
+        ),
+    ),
+    _create_generic_command_adapter,
+    _get_generic_command_status,
 )

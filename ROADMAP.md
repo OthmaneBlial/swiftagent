@@ -402,6 +402,8 @@ runs with Claude Code, Codex, and OpenCode through the same interface.
 
 ### 1.4 Add the restricted generic command adapter
 
+**Status: completed, validated, and pushed.**
+
 - Use a reviewed manifest schema with executable path, literal arguments,
   prompt transport, working-directory behavior, timeout, environment allowlist,
   and optional version probe.

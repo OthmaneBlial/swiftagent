@@ -28,5 +28,6 @@ class AppSettings(BaseModel):
     codex_allow_dangerous_bypass: bool = False
     opencode_model: str | None = None
     opencode_cli_path: str | None = None
+    generic_command_manifest_json: str = ""
     workspace_dir: str
     sandbox_mode: Literal["strict", "fallback"] = "strict"

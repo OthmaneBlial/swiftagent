@@ -169,6 +169,7 @@ def get_app_settings() -> AppSettings:
             "opencode_cli_path", os.environ.get("SWIFTAGENT_OPENCODE_PATH", "")
         ).strip()
         or None,
+        generic_command_manifest_json=_get("generic_command_manifest_json", "").strip(),
         workspace_dir=get_workspace_dir(),
         sandbox_mode=get_sandbox_mode(),
     )

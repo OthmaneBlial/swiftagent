@@ -1,0 +1,10 @@
+{
+  "source": "https://github.com/agentclientprotocol/agent-client-protocol/releases/tag/schema-v1.21.0",
+  "protocolVersion": 1,
+  "messages": [
+    {"direction": "client_to_agent", "method": "initialize", "params": {"protocolVersion": 1}},
+    {"direction": "agent_to_client", "method": "session/update", "params": {"sessionId": "fake-acp-session", "update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "ACP fixture completed."}}}},
+    {"direction": "agent_to_client", "method": "session/request_permission", "params": {"sessionId": "fake-acp-session", "toolCall": {"toolCallId": "fixture-write", "title": "Write fixture output"}, "options": [{"optionId": "allow", "name": "Allow once", "kind": "allow_once"}]}},
+    {"direction": "client_to_agent", "method": "session/cancel", "params": {"sessionId": "fake-acp-session"}}
+  ]
+}

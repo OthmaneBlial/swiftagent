@@ -115,6 +115,16 @@ def update_task_native_session_id(task_id: str, session_id: str) -> None:
     db.commit()
 
 
+def update_task_capability_snapshot(task_id: str, capabilities: dict[str, object]) -> None:
+    """Persist capabilities negotiated after an adapter starts."""
+    db = get_database()
+    db.execute(
+        "UPDATE tasks SET capability_snapshot_json = ? WHERE id = ?",
+        (json.dumps(capabilities), task_id),
+    )
+    db.commit()
+
+
 def update_task_summary(task_id: str, summary: str) -> None:
     db = get_database()
     db.execute("UPDATE tasks SET summary = ? WHERE id = ?", (summary, task_id))

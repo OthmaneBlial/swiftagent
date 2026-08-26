@@ -18,5 +18,6 @@ class AppSettings(BaseModel):
     claude_model: str | None = None
     claude_permission_mode: str = "default"
     claude_cli_path: str | None = None
+    acp_command_json: str = ""
     workspace_dir: str
     sandbox_mode: Literal["strict", "fallback"] = "strict"

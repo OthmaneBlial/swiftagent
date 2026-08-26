@@ -2,6 +2,12 @@
 
 All notable changes are documented here. This project follows semantic versioning for public releases.
 
+## Unreleased
+
+- Add a local ACP v1 client adapter based on the official SDK, with negotiated capabilities, native session creation/loading, permissions, streamed updates, cancellation, and bounded native diagnostics.
+- Confine ACP file and terminal callbacks to the selected workspace, use literal command arrays, cap retained output, and preserve strict Bubblewrap fail-closed behavior.
+- Add settings UI, stable schema evidence, and a deterministic ACP fake-agent contract suite.
+
 ## 0.3.0 — 2026-08-26
 
 - Replace the Claude-specific task core with an agent registry, capability contracts, normalized events, and adapter-owned process lifecycles.

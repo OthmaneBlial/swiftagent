@@ -4,6 +4,7 @@ App settings repository — key-value store in SQLite.
 
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 
@@ -132,6 +133,13 @@ def set_sandbox_mode(mode: str) -> None:
 
 
 def get_app_settings() -> AppSettings:
+    acp_command_raw = _get(
+        "acp_command_json", os.environ.get("SWIFTAGENT_ACP_COMMAND_JSON", "")
+    ).strip()
+    try:
+        acp_command_value = json.loads(acp_command_raw) if acp_command_raw else []
+    except json.JSONDecodeError:
+        acp_command_value = acp_command_raw
     return AppSettings(
         debug_mode=get_debug_mode(),
         theme=get_theme(),
@@ -139,6 +147,11 @@ def get_app_settings() -> AppSettings:
         claude_model=get_claude_model(),
         claude_permission_mode=get_claude_permission_mode(),
         claude_cli_path=get_claude_cli_path(),
+        acp_command_json=(
+            json.dumps(acp_command_value, ensure_ascii=False)
+            if isinstance(acp_command_value, list)
+            else acp_command_raw
+        ),
         workspace_dir=get_workspace_dir(),
         sandbox_mode=get_sandbox_mode(),
     )

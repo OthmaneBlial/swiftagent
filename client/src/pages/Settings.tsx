@@ -51,6 +51,8 @@ export default function Settings() {
         try {
             const updated = await api.updateSettings(settings);
             setSettings(updated);
+            const catalog = await api.listAgents(true);
+            setAgents(catalog.agents);
             applyTheme(updated.theme);
             toast.success('Settings saved', `${updated.default_agent_id} is your default agent.`);
         } catch (error) {
@@ -231,6 +233,27 @@ export default function Settings() {
                                     className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm"
                                 />
                             </label>
+                        </div>
+                    </details>
+                ) : null}
+
+                {agents.some((agent) => agent.agent_id === 'acp-agent') ? (
+                    <details className="rounded-2xl border border-border bg-card p-5">
+                        <summary className="cursor-pointer text-sm font-semibold text-foreground">ACP adapter options</summary>
+                        <div className="mt-4 space-y-2">
+                            <label className="block space-y-1.5">
+                                <span className="text-xs text-muted-foreground">Literal command array</span>
+                                <input
+                                    value={settings.acp_command_json}
+                                    onChange={(event) => update('acp_command_json', event.target.value)}
+                                    placeholder='["your-agent", "acp"]'
+                                    spellCheck={false}
+                                    className="h-10 w-full rounded-xl border border-border bg-background px-3 font-mono text-xs"
+                                />
+                            </label>
+                            <p className="text-[11px] leading-relaxed text-muted-foreground">
+                                One JSON string per argument. SwiftAgent launches this directly without a shell; authentication stays with the agent.
+                            </p>
                         </div>
                     </details>
                 ) : null}

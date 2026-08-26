@@ -11,6 +11,7 @@ from typing import Literal
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
+from swiftagent.agents.acp import settings as acp_settings
 from swiftagent.agents.registry import agent_registry
 from swiftagent.models.settings import AppSettings
 from swiftagent.models.task import Task
@@ -80,6 +81,7 @@ class SettingsUpdate(BaseModel):
         Literal["default", "acceptEdits", "dontAsk", "bypassPermissions", "plan"] | None
     ) = None
     claude_cli_path: str | None = Field(default=None, max_length=4_096)
+    acp_command_json: str | None = Field(default=None, max_length=16_384)
     workspace_dir: str | None = Field(default=None, max_length=4_096)
     sandbox_mode: Literal["strict", "fallback"] | None = None
 
@@ -103,6 +105,16 @@ async def update_settings(update: SettingsUpdate):
         settings_repo.set_claude_permission_mode(mode)
     if update.claude_cli_path is not None:
         settings_repo.set_claude_cli_path(update.claude_cli_path or None)
+    if update.acp_command_json is not None:
+        raw_command = update.acp_command_json.strip()
+        if not raw_command:
+            acp_settings.set_command(None)
+        else:
+            try:
+                command = acp_settings.parse_command(raw_command)
+            except ValueError as exc:
+                raise HTTPException(400, str(exc)) from exc
+            acp_settings.set_command(command)
     if update.workspace_dir is not None:
         raw_workspace = update.workspace_dir.strip()
         if not raw_workspace:

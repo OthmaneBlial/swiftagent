@@ -5,13 +5,14 @@ build-backend = "hatchling.build"
 [project]
 name = "swiftagent"
 version = "0.3.0"
-description = "A local, workspace-scoped web control room for Claude Code"
+description = "A local, workspace-scoped control room for coding agents"
 requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.115.0",
     "uvicorn[standard]>=0.34.0",
     "websockets>=14.0",
     "pydantic>=2.10.0",
+    "agent-client-protocol>=0.12.1,<0.13",
 ]
 
 [project.optional-dependencies]

@@ -85,6 +85,18 @@ def _get_claude_status(definition: AgentDefinition) -> AgentStatus:
     return get_status(definition)
 
 
+def _create_acp_adapter(task: Task, manager: Any) -> AgentAdapter:
+    from swiftagent.agents.acp import AcpAdapter
+
+    return AcpAdapter(task, manager)
+
+
+def _get_acp_status(definition: AgentDefinition) -> AgentStatus:
+    from swiftagent.agents.acp.status import get_status
+
+    return get_status(definition)
+
+
 agent_registry = AgentRegistry()
 agent_registry.register(
     AgentDefinition(
@@ -109,4 +121,27 @@ agent_registry.register(
     ),
     _create_claude_adapter,
     _get_claude_status,
+)
+agent_registry.register(
+    AgentDefinition(
+        agent_id="acp-agent",
+        display_name="ACP Agent",
+        adapter_id="acp-v1",
+        adapter_version="0.4.0",
+        protocol="acp-v1",
+        install_url="https://agentclientprotocol.com/get-started/introduction",
+        documentation_url="https://agentclientprotocol.com/protocol/overview",
+        capabilities=AgentCapabilities(
+            structured_streaming=True,
+            session_resume=False,
+            tool_events=True,
+            approvals=True,
+            questions=False,
+            plan_updates=True,
+            usage=True,
+            external_sandbox="partial",
+        ),
+    ),
+    _create_acp_adapter,
+    _get_acp_status,
 )

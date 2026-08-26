@@ -5,6 +5,7 @@ from __future__ import annotations
 import shutil
 import subprocess
 import time
+from collections.abc import Sequence
 from pathlib import Path
 
 _BWRAP_CACHE_TTL_SEC = 30.0
@@ -80,3 +81,55 @@ def check_bwrap_usable(workspace: Path) -> tuple[bool, str | None]:
     _bwrap_cache["reason"] = reason
 
     return usable, reason
+
+
+def wrap_command_for_sandbox(
+    command: Sequence[str],
+    workspace: Path,
+    sandbox_mode: str,
+    *,
+    writable_paths: Sequence[Path] = (),
+) -> tuple[list[str], str | None]:
+    """Wrap a literal argv for strict bwrap isolation or explicit fallback."""
+    argv = [str(part) for part in command]
+    if not argv:
+        raise ValueError("Command cannot be empty")
+    if sandbox_mode != "strict":
+        return argv, "Fallback mode is active. This process is not OS-isolated."
+
+    bwrap_path = shutil.which("bwrap")
+    if not bwrap_path:
+        raise RuntimeError(
+            "Strict sandbox is unavailable because bwrap is not installed. "
+            "Install bwrap, or explicitly select fallback mode after reviewing its warning."
+        )
+    usable, reason = check_bwrap_usable(workspace)
+    if not usable:
+        raise RuntimeError(
+            "Strict sandbox is unavailable in this environment "
+            f"({reason or 'unknown error'}). Repair bwrap or explicitly select fallback mode."
+        )
+
+    wrapped = [
+        bwrap_path,
+        "--die-with-parent",
+        "--ro-bind",
+        "/",
+        "/",
+        "--dev-bind",
+        "/dev",
+        "/dev",
+        "--proc",
+        "/proc",
+        "--tmpfs",
+        "/tmp",
+        "--bind",
+        str(workspace),
+        str(workspace),
+    ]
+    for writable in writable_paths:
+        resolved = writable.expanduser().resolve()
+        resolved.mkdir(parents=True, exist_ok=True)
+        wrapped.extend(["--bind", str(resolved), str(resolved)])
+    wrapped.extend(["--chdir", str(workspace), *argv])
+    return wrapped, None

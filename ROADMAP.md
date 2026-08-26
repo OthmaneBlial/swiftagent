@@ -8,11 +8,11 @@
 
 **Last reviewed:** 2026-08-26
 
-**Current baseline:** `v0.2.1` is a solid Claude Code-specific implementation:
-FastAPI and React, `stream-json` events, SQLite history, session resumption,
-workspace-scoped files, task queueing, and strict Bubblewrap behavior that
-fails closed. The next releases must preserve those guarantees while replacing
-the Claude-specific core with a capability-driven agent platform.
+**Current baseline:** `v0.3.0` has shipped the agent-neutral registry,
+capability and event contracts, isolated Claude Code adapter, forward-only
+history migration, and agent-aware interface. The `v0.4.0` work now adds
+verified protocol and native adapters without weakening workspace containment,
+queueing, cancellation, or strict Bubblewrap behavior.
 
 ## The new promise
 
@@ -298,6 +298,8 @@ suite.
 
 ### 0.1 Freeze the current contract with fixtures
 
+**Status: completed and pushed.**
+
 - Capture redacted Claude Code stream fixtures for text, tool use/results,
   session ID, success, failure, malformed lines, cancellation, and resume.
 - Add tests for current engine probe, CLI argument construction, strict
@@ -306,6 +308,8 @@ suite.
   `claude` executables emit the same protocol.
 
 ### 0.2 Introduce the agent registry and normalized events
+
+**Status: completed and pushed.**
 
 - Add the `AgentAdapter`, `AgentCapabilities`, `AgentStatus`, and normalized
   event schemas.
@@ -318,6 +322,8 @@ suite.
 
 ### 0.3 Convert Claude Code into the first adapter
 
+**Status: completed and pushed.**
+
 - Move discovery, arguments, parser, state paths, and settings out of generic
   core modules.
 - Map native messages into normalized events without losing raw diagnostic
@@ -328,6 +334,8 @@ suite.
   failure semantics.
 
 ### 0.4 Ship the first agent-aware UI
+
+**Status: completed and pushed.**
 
 - Replace Claude-specific Settings with “Your agents,” workspace defaults, and
   per-agent configuration.
@@ -354,6 +362,8 @@ suite.
 runs with Claude Code, Codex, and OpenCode through the same interface.
 
 ### 1.1 Build the ACP client adapter
+
+**Status: completed, validated, and pushed.**
 
 - Implement stable ACP initialization, capability negotiation,
   authentication handoff, session create/load, prompt turns, updates,

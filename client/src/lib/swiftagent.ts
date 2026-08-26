@@ -53,6 +53,7 @@ export interface AppSettings {
     claude_model: string | null;
     claude_permission_mode: string;
     claude_cli_path: string | null;
+    acp_command_json: string;
     workspace_dir: string;
     sandbox_mode: 'strict' | 'fallback';
 }

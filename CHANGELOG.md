@@ -4,6 +4,10 @@ All notable changes are documented here. This project follows semantic versionin
 
 ## Unreleased
 
+## 0.6.0 — 2026-08-27
+
+- Add a verified tagged bundle path with a prebuilt client, clean-install smoke test, SHA-256 checksums, SPDX JSON SBOM, GitHub provenance/SBOM attestations, and five deterministic adapter evaluation receipts.
+- Publish focused Claude Code, Codex, OpenCode, and ACP pages under the agent-neutral control-room position, plus opt-in compatibility and workflow-friction feedback with no telemetry.
 - Add structured adapter proposal and compatibility-report forms, a standalone first-adapter walkthrough, evidence-based release credits, and eight bounded contribution issue seeds.
 - Add backend-enforced and UI-visible adapter trust levels: built-in verified, community verified for exact reviewed evidence, and non-endorsed local custom.
 - Keep trust assignment outside local manifests and document a no-auto-download policy plus signature, provenance, ownership, update, and install-confirmation gates for any future registry.
@@ -12,7 +16,7 @@ All notable changes are documented here. This project follows semantic versionin
 - Add durable Local Run Receipts with normalized/native event evidence, separate safety layers, Git impact, explicit verification status, and JSON/Markdown export.
 - Add expiring single-use cross-agent handoff previews with user-selected context, visible redaction reports, source/target links, and no native session transfer.
 - Add the dependency-free Northstar three-agent demo fixture, isolated Git workspace preparation, deterministic verification, a real protocol-fixture screenshot/GIF, and an agent-neutral project site.
-- Publish a CI-checked v0.4 compatibility matrix using only verified, partial, unsupported, and unknown evidence levels.
+- Publish a CI-checked compatibility matrix using only verified, partial, unsupported, and unknown evidence levels.
 - Add one shared harmless acceptance task across Claude Code, Codex, and OpenCode fixtures, plus a Claude cancellation race regression.
 - Add a text-only generic-command adapter with a reviewed schema-v1 manifest, literal argv/stdin transport, environment allowlist, bounded output/timeout, process-group cleanup, and no shell interpolation.
 - Require a matching disposable-workspace test receipt before a generic command can run real tasks; manifest or executable changes disable it automatically.

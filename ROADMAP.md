@@ -6,13 +6,16 @@
 > reviewable workflow without losing their native capabilities or safety
 > semantics.
 
-**Last reviewed:** 2026-08-26
+**Last reviewed:** 2026-08-27
 
-**Current baseline:** `v0.3.0` has shipped the agent-neutral registry,
+**Original audited baseline:** `v0.3.0` shipped the agent-neutral registry,
 capability and event contracts, isolated Claude Code adapter, forward-only
-history migration, and agent-aware interface. The `v0.4.0` work now adds
-verified protocol and native adapters without weakening workspace containment,
-queueing, cancellation, or strict Bubblewrap behavior.
+history migration, and agent-aware interface.
+
+**Delivery status:** `v0.6.0` completes this roadmap with ACP, Codex, OpenCode,
+and restricted-command adapters; receipts and handoffs; Adapter API 1.0; trust
+and contribution contracts; a tagged supply-chain-aware release path; and
+agent-focused pages under one agent-neutral product position.
 
 ## The new promise
 
@@ -553,6 +556,8 @@ an explicit installation confirmation.
 ## Milestone 4 — distribution and growth based on proof
 
 **Target:** after the three built-in adapters and receipt workflow are stable.
+
+**Status: completed, validated, published, and pushed.**
 
 - Choose and verify one tagged installation path; attach checksums, SBOM, and
   provenance where the build system can prove them.

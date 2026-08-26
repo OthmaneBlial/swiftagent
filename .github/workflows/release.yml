@@ -1,0 +1,77 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  actions: read
+  attestations: write
+  contents: write
+  id-token: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+      - name: Install development dependencies
+        run: make setup
+      - name: Verify source, adapters, and demo
+        run: |
+          make lint
+          make test
+          make adapter-kit-test
+          make demo-verify
+      - name: Generate adapter evaluation receipts
+        run: server/.venv/bin/python scripts/generate_evaluation_receipts.py
+      - name: Build tagged bundle
+        run: server/.venv/bin/python scripts/build_release.py --tag "$GITHUB_REF_NAME"
+      - name: Verify clean tagged installation
+        run: python3 scripts/verify_release_bundle.py "dist/swiftagent-$GITHUB_REF_NAME.tar.gz"
+      - name: Generate SPDX JSON SBOM
+        uses: anchore/sbom-action@v0.24.0
+        with:
+          path: "dist/release-staging/swiftagent-${{ github.ref_name }}"
+          format: spdx-json
+          output-file: "dist/swiftagent-${{ github.ref_name }}.spdx.json"
+          upload-artifact: "false"
+          upload-release-assets: "false"
+      - name: Write release checksums
+        working-directory: dist
+        run: sha256sum swiftagent-*.tar.gz swiftagent-*.spdx.json swiftagent-*-evaluation.json > SHA256SUMS
+      - name: Attest build provenance
+        uses: actions/attest@v4
+        with:
+          subject-path: "dist/swiftagent-${{ github.ref_name }}.tar.gz"
+      - name: Attest release SBOM
+        uses: actions/attest@v4
+        with:
+          subject-path: "dist/swiftagent-${{ github.ref_name }}.tar.gz"
+          sbom-path: "dist/swiftagent-${{ github.ref_name }}.spdx.json"
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            "dist/swiftagent-$GITHUB_REF_NAME.tar.gz" \
+            "dist/swiftagent-$GITHUB_REF_NAME.spdx.json" \
+            dist/swiftagent-*-evaluation.json \
+            dist/SHA256SUMS \
+            --repo "$GITHUB_REPOSITORY" \
+            --verify-tag \
+            --latest \
+            --title "SwiftAgent $GITHUB_REF_NAME" \
+            --notes-file "docs/releases/$GITHUB_REF_NAME.md"

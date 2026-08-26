@@ -138,7 +138,7 @@ class AcpAdapter:
                 client_info=Implementation(
                     name="swiftagent",
                     title="SwiftAgent",
-                    version="0.4.0-dev",
+                    version="0.6.0",
                 ),
             ),
             timeout=15,

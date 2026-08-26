@@ -137,7 +137,7 @@ class CodexAdapter:
                 "clientInfo": {
                     "name": "swiftagent",
                     "title": "SwiftAgent",
-                    "version": "0.4.0-dev",
+                    "version": "0.6.0",
                 },
                 "capabilities": {"experimentalApi": False},
             },

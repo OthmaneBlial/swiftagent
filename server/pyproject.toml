@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "swiftagent"
-version = "0.3.0"
+version = "0.6.0"
 description = "A local, workspace-scoped control room for coding agents"
 requires-python = ">=3.11"
 dependencies = [

@@ -23,7 +23,7 @@ FIXTURES = Path(__file__).parent / "fixtures"
 CLAUDE_FIXTURE = FIXTURES / "claude_stream" / "fake_claude.py"
 CODEX_FIXTURE = FIXTURES / "codex" / "fake_app_server.py"
 OPENCODE_FIXTURE = FIXTURES / "opencode" / "fake_opencode.py"
-MATRIX_FIXTURE = FIXTURES / "compatibility-v0.4.json"
+MATRIX_FIXTURE = FIXTURES / "compatibility-v0.6.json"
 COMMON_PROMPT = "Inspect the disposable fixture and report completion without network access."
 
 

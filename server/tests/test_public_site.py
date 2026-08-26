@@ -17,6 +17,8 @@ def test_public_site_is_agent_agnostic_and_links_real_demo_media() -> None:
     assert "Claude Code,<br /><em>with a flight deck" not in index
     assert "Local control for Claude Code" not in index + docs
     assert 'media="(prefers-reduced-motion: reduce)"' in index
+    assert "swiftagent-v0.6.0.tar.gz" in index + docs
+    assert "SHA256SUMS" in index + docs
 
     screenshot = ROOT / "site" / "assets" / "swiftagent-run-receipt.png"
     animation = ROOT / "site" / "assets" / "swiftagent-three-agent-demo.gif"

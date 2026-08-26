@@ -27,7 +27,7 @@ from swiftagent.storage import settings as settings_repo
 from swiftagent.storage.database import close_database, init_database
 
 logger = logging.getLogger(__name__)
-VERSION = "0.3.0"
+VERSION = "0.6.0"
 
 
 def _configure_logging() -> None:

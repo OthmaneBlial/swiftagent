@@ -17,7 +17,26 @@ result, and separate safety layers. No provider/model call._
 
 Point SwiftAgent at a project folder, choose an available agent, and describe the outcome. Responses, tool calls, safety state, and final results stay in one local timeline. When an adapter proves native resume support, a later follow-up can continue that session instead of starting from zero.
 
-## Try it locally
+## Install the tagged release
+
+The supported release path includes a prebuilt client plus checksums, SPDX SBOM,
+and GitHub attestations. It needs Python 3.11+, `make`, and the GitHub CLI:
+
+```bash
+gh release download v0.6.0 --repo OthmaneBlial/swiftagent \
+  --pattern 'swiftagent-v0.6.0.tar.gz' --pattern 'SHA256SUMS'
+shasum -a 256 -c SHA256SUMS --ignore-missing
+gh attestation verify swiftagent-v0.6.0.tar.gz --repo OthmaneBlial/swiftagent
+tar -xzf swiftagent-v0.6.0.tar.gz
+cd swiftagent-v0.6.0
+make install-release
+make start-release
+```
+
+See the [tagged installation guide](docs/INSTALL_RELEASE.md) for expected
+verification output, SBOM evidence, and boundaries.
+
+## Develop from source
 
 Prerequisites: Python 3.11+, Node.js 18+, and at least one installed coding agent supported by an enabled adapter.
 
@@ -142,7 +161,7 @@ FastAPI ── Task manager ── Agent registry ── selected local adapter
    └── SQLite history/settings and workspace-scoped file API
 ```
 
-More detail: [architecture](docs/ARCHITECTURE.md) · [compatibility matrix](docs/COMPATIBILITY.md) · [first adapter](docs/FIRST_ADAPTER.md) · [adapter developer kit](docs/ADAPTER_SDK.md) · [adapter trust policy](docs/ADAPTER_TRUST.md) · [release and compatibility credits](docs/RELEASE_PROCESS.md) · [Local Run Receipts](docs/RUN_RECEIPTS.md) · [cross-agent handoffs](docs/HANDOFFS.md) · [ACP adapter](docs/ACP_ADAPTER.md) · [Codex adapter](docs/CODEX_ADAPTER.md) · [OpenCode adapter](docs/OPENCODE_ADAPTER.md) · [generic command adapter](docs/GENERIC_COMMAND_ADAPTER.md) · [reproducible demo](docs/DEMO.md).
+More detail: [architecture](docs/ARCHITECTURE.md) · [tagged installation](docs/INSTALL_RELEASE.md) · [compatibility matrix](docs/COMPATIBILITY.md) · [adoption scorecard](docs/ADOPTION_SCORECARD.md) · [first adapter](docs/FIRST_ADAPTER.md) · [adapter developer kit](docs/ADAPTER_SDK.md) · [adapter trust policy](docs/ADAPTER_TRUST.md) · [release and compatibility credits](docs/RELEASE_PROCESS.md) · [Local Run Receipts](docs/RUN_RECEIPTS.md) · [cross-agent handoffs](docs/HANDOFFS.md) · [ACP adapter](docs/ACP_ADAPTER.md) · [Codex adapter](docs/CODEX_ADAPTER.md) · [OpenCode adapter](docs/OPENCODE_ADAPTER.md) · [generic command adapter](docs/GENERIC_COMMAND_ADAPTER.md) · [reproducible demo](docs/DEMO.md).
 
 ## Quality checks
 

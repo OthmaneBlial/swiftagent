@@ -1,0 +1,57 @@
+name: Workflow friction report
+description: Share a redacted first-run or multi-agent workflow obstacle without telemetry.
+title: "[Workflow friction]: "
+labels: ["ui"]
+body:
+  - type: dropdown
+    id: stage
+    attributes:
+      label: Where did friction occur?
+      options:
+        - Install or launch
+        - Agent detection or authentication
+        - First successful run
+        - Agent switching or capability controls
+        - Review, receipt, or verification
+        - Cross-agent handoff
+        - Adapter development
+    validations:
+      required: true
+  - type: input
+    id: scope
+    attributes:
+      label: SwiftAgent version, agent, OS, and architecture
+      placeholder: v0.6.0 · Codex 0.149.1 · macOS arm64
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected path
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: What slowed or blocked you?
+    validations:
+      required: true
+  - type: input
+    id: timing
+    attributes:
+      label: Approximate time to understand detection or complete the first run
+      description: Optional and user-reported; SwiftAgent records no telemetry.
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Redacted evidence
+      description: Include bounded logs or a receipt only after removing secrets, native session IDs, private code, prompts, and personal paths.
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Privacy check
+      options:
+        - label: I reviewed this report and removed credentials, native session IDs, private content, and personal paths.
+          required: true
+        - label: I understand this public report is opt-in and SwiftAgent uses no silent telemetry.
+          required: true

@@ -1,6 +1,6 @@
 # Adapter compatibility matrix
 
-Last verified: 2026-08-26 for the in-development v0.4 line.
+Last verified: 2026-08-27 for SwiftAgent v0.6.0.
 
 The words in this matrix are evidence levels, not marketing labels:
 
@@ -36,11 +36,11 @@ unknown because its live version probe failed; its row is fixture-backed only.
 | Generic command | **verified** | **unsupported** | **unsupported** | **unsupported** | **unsupported** | **unsupported** | **unsupported** | **unsupported** | **verified** |
 
 The machine-readable source used by CI is
-[`server/tests/fixtures/compatibility-v0.4.json`](../server/tests/fixtures/compatibility-v0.4.json).
+[`server/tests/fixtures/compatibility-v0.6.json`](../server/tests/fixtures/compatibility-v0.6.json).
 CI rejects missing adapters, unknown status words, a **verified** feature absent
 from the registry, or an **unsupported** feature still declared to the UI.
 
-## Shared v0.4 acceptance evidence
+## Shared v0.6 acceptance evidence
 
 - Claude Code, Codex, and OpenCode complete the same harmless, no-network prompt
   through their own deterministic transports and persist assistant history plus
@@ -64,4 +64,4 @@ from the registry, or an **unsupported** feature still declared to the UI.
 - Attachments and explicit session fork controls remain milestone 2 work and are
   not advertised merely because a native protocol announced them.
 - Remote agents, shared sessions, multi-user authentication, and hosted control
-  planes remain out of scope for v0.4.
+  planes remain out of scope for v0.6.

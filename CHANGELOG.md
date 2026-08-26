@@ -4,6 +4,8 @@ All notable changes are documented here. This project follows semantic versionin
 
 ## Unreleased
 
+- Publish a CI-checked v0.4 compatibility matrix using only verified, partial, unsupported, and unknown evidence levels.
+- Add one shared harmless acceptance task across Claude Code, Codex, and OpenCode fixtures, plus a Claude cancellation race regression.
 - Add a text-only generic-command adapter with a reviewed schema-v1 manifest, literal argv/stdin transport, environment allowlist, bounded output/timeout, process-group cleanup, and no shell interpolation.
 - Require a matching disposable-workspace test receipt before a generic command can run real tasks; manifest or executable changes disable it automatically.
 - Add an ACP-first OpenCode 1.18 adapter with version/transport detection, CLI-owned model discovery, native resume, explicit model configuration, and no automatic session sharing.

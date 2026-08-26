@@ -47,6 +47,7 @@ class ClaudeCodeAdapter:
         self._completion_lock = asyncio.Lock()
         self._completed = False
         self._saw_result = False
+        self._cancel_requested = False
 
     @property
     def running(self) -> bool:
@@ -136,6 +137,11 @@ class ClaudeCodeAdapter:
                 pass
 
         if self._completed:
+            return
+
+        if self._cancel_requested:
+            # cancel() owns the terminal status; a SIGTERM must not race it into
+            # a misleading failed process-exit result.
             return
 
         if self._saw_result:
@@ -363,6 +369,7 @@ class ClaudeCodeAdapter:
             )
 
     async def cancel(self) -> None:
+        self._cancel_requested = True
         if self._process and self._process.returncode is None:
             try:
                 os.killpg(self._process.pid, signal.SIGTERM)

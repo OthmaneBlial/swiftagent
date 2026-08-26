@@ -140,6 +140,10 @@ class FakeOpenCodeAgent:
     async def prompt(self, session_id: str, prompt: list[Any], **_kwargs: Any) -> PromptResponse:
         if session_id != SESSION_ID or self.cwd is None:
             raise RequestError.invalid_params({"details": "fixture session is not initialized"})
+        prompt_text = "".join(
+            str(getattr(block, "text", "")) for block in prompt
+        )
+        _record({"method": "prompt", "prompt": prompt_text})
         if os.environ.get("SWIFTAGENT_TEST_OPENCODE_SCENARIO") == "cancel":
             await self.cancelled.wait()
             return PromptResponse(stopReason="cancelled")

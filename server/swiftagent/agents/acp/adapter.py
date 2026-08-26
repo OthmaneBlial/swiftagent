@@ -253,13 +253,17 @@ class AcpAdapter:
             {
                 "structured_streaming": True,
                 "session_resume": load_session or bool(getattr(sessions, "resume", None)),
-                "session_fork": bool(getattr(sessions, "fork", None)),
+                "session_fork": False,
+                "native_session_fork": bool(getattr(sessions, "fork", None)),
                 "tool_events": True,
                 "approvals": True,
                 "questions": False,
                 "plan_updates": True,
-                "attachments": bool(attachments),
-                "attachment_types": attachments,
+                # Preserve native negotiation for the future attachment router,
+                # but do not advertise an input path the adapter does not yet send.
+                "attachments": False,
+                "attachment_types": [],
+                "native_attachment_types": attachments,
                 "usage": True,
                 "cancellation": True,
             }

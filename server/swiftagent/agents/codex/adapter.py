@@ -177,7 +177,8 @@ class CodexAdapter:
             {
                 "structured_streaming": True,
                 "session_resume": True,
-                "session_fork": True,
+                "session_fork": False,
+                "native_session_fork": True,
                 "tool_events": True,
                 "approvals": True,
                 "questions": True,

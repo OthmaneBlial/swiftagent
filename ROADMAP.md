@@ -417,6 +417,8 @@ runs with Claude Code, Codex, and OpenCode through the same interface.
 
 ### 1.5 Publish the compatibility matrix
 
+**Status: completed, validated, and pushed.**
+
 For every built-in adapter, document:
 
 - tested agent versions and operating systems;

@@ -9,19 +9,17 @@ from __future__ import annotations
 
 import asyncio
 import json
-import traceback
-from typing import Any
+import logging
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from pydantic import ValidationError
 
-from swiftagent.models.events import (
-    PermissionResponse,
-    WSEvent,
-    WSEventType,
-)
-from swiftagent.models.task import Task, TaskConfig, TaskStatus
+from swiftagent.models.events import WSEvent, WSEventType
+from swiftagent.models.task import TaskConfig
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
+MAX_WS_MESSAGE_BYTES = 256 * 1024
 
 
 class ConnectionManager:
@@ -35,12 +33,12 @@ class ConnectionManager:
     async def connect(self, ws: WebSocket) -> None:
         await ws.accept()
         self._connections.append(ws)
-        print(f"[WS] Client connected ({len(self._connections)} total)")
+        logger.info("ws_connected connections=%s", len(self._connections))
 
     def disconnect(self, ws: WebSocket) -> None:
         if ws in self._connections:
             self._connections.remove(ws)
-        print(f"[WS] Client disconnected ({len(self._connections)} total)")
+        logger.info("ws_disconnected connections=%s", len(self._connections))
 
     async def broadcast(self, event: WSEvent) -> None:
         """Send an event to all connected clients."""
@@ -66,7 +64,7 @@ class ConnectionManager:
         await self.broadcast(event)
         try:
             return await asyncio.wait_for(future, timeout=300)  # 5 min timeout
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return False
         finally:
             self._pending_permissions.pop(request_id, None)
@@ -85,7 +83,7 @@ class ConnectionManager:
         await self.broadcast(event)
         try:
             return await asyncio.wait_for(future, timeout=600)  # 10 min timeout
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return ""
         finally:
             self._pending_questions.pop(request_id, None)
@@ -106,23 +104,46 @@ async def websocket_endpoint(ws: WebSocket):
     try:
         while True:
             raw = await ws.receive_text()
+            if len(raw.encode("utf-8")) > MAX_WS_MESSAGE_BYTES:
+                await manager.send(
+                    ws,
+                    WSEvent(
+                        type=WSEventType.TASK_ERROR,
+                        payload={
+                            "error": "Message is too large. Keep task prompts below 50,000 characters."
+                        },
+                    ),
+                )
+                continue
             try:
                 data = json.loads(raw)
                 event_type = data.get("type")
                 payload = data.get("payload", {})
                 task_id = data.get("task_id")
-
+                if not isinstance(payload, dict):
+                    raise ValueError("Event payload must be a JSON object")
                 await _handle_client_event(ws, event_type, payload, task_id)
             except json.JSONDecodeError:
-                await manager.send(ws, WSEvent(
-                    type=WSEventType.TASK_ERROR,
-                    payload={"error": "Invalid JSON"},
-                ))
+                await manager.send(
+                    ws,
+                    WSEvent(
+                        type=WSEventType.TASK_ERROR,
+                        payload={"error": "Invalid JSON"},
+                    ),
+                )
+            except (ValidationError, ValueError) as exc:
+                await manager.send(
+                    ws,
+                    WSEvent(
+                        type=WSEventType.TASK_ERROR,
+                        task_id=task_id if isinstance(task_id, str) else None,
+                        payload={"error": str(exc)},
+                    ),
+                )
     except WebSocketDisconnect:
         manager.disconnect(ws)
     except Exception as e:
-        print(f"[WS] Error: {e}")
-        traceback.print_exc()
+        logger.exception("websocket_error error=%s", e)
         manager.disconnect(ws)
 
 
@@ -138,18 +159,24 @@ async def _handle_client_event(
         # Task start is handled via REST POST /api/tasks
         # but we can also support it over WS for convenience
         from swiftagent.engine.manager import task_manager
+
         config = TaskConfig(**payload)
         task = await task_manager.start_task(config, manager)
-        await manager.send(ws, WSEvent(
-            type=WSEventType.TASK_STARTED,
-            task_id=task.id,
-            payload=task.model_dump(),
-        ))
+        await manager.send(
+            ws,
+            WSEvent(
+                type=WSEventType.TASK_STARTED,
+                task_id=task.id,
+                payload=task.model_dump(),
+            ),
+        )
 
     elif event_type == WSEventType.CANCEL_TASK.value:
         from swiftagent.engine.manager import task_manager
-        if task_id:
-            await task_manager.cancel_task(task_id)
+
+        if not task_id:
+            raise ValueError("task_id is required to cancel a task")
+        await task_manager.cancel_task(task_id)
 
     elif event_type == WSEventType.PERMISSION_RESPONSE.value:
         request_id = payload.get("request_id", "")
@@ -163,11 +190,17 @@ async def _handle_client_event(
 
     elif event_type == WSEventType.RESUME_SESSION.value:
         from swiftagent.engine.manager import task_manager
+
         session_id = payload.get("session_id", "")
         prompt = payload.get("prompt", "")
         task = await task_manager.resume_session(session_id, prompt, manager)
-        await manager.send(ws, WSEvent(
-            type=WSEventType.TASK_STARTED,
-            task_id=task.id,
-            payload=task.model_dump(),
-        ))
+        await manager.send(
+            ws,
+            WSEvent(
+                type=WSEventType.TASK_STARTED,
+                task_id=task.id,
+                payload=task.model_dump(),
+            ),
+        )
+    else:
+        raise ValueError("Unsupported WebSocket event type")

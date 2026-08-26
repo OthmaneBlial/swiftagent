@@ -7,17 +7,20 @@ Ported from base/accomplish/packages/agent-core/src/storage/repositories/taskHis
 from __future__ import annotations
 
 import json
-from datetime import datetime
+from datetime import UTC, datetime
 
 from swiftagent.models.task import Task, TaskConfig, TaskMessage, TaskResult, TaskStatus, TodoItem
 from swiftagent.storage.database import get_database
 
-
 # ── Tasks ─────────────────────────────────────────────────────
 
-def get_tasks() -> list[Task]:
+
+def get_tasks(limit: int = 50, offset: int = 0) -> list[Task]:
     db = get_database()
-    rows = db.execute("SELECT * FROM tasks ORDER BY created_at DESC").fetchall()
+    rows = db.execute(
+        "SELECT * FROM tasks ORDER BY created_at DESC LIMIT ? OFFSET ?",
+        (limit, offset),
+    ).fetchall()
     return [_row_to_task(r) for r in rows]
 
 
@@ -35,7 +38,7 @@ def save_task(task: Task) -> None:
     db = get_database()
     db.execute(
         """
-        INSERT OR REPLACE INTO tasks (id, prompt, working_directory, status,
+        INSERT INTO tasks (id, prompt, working_directory, status,
             session_id, summary, result_json, config_json, created_at, completed_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
@@ -55,11 +58,35 @@ def save_task(task: Task) -> None:
     db.commit()
 
 
-def update_task_status(task_id: str, status: TaskStatus, completed_at: datetime | None = None) -> None:
+def update_task_status(
+    task_id: str, status: TaskStatus, completed_at: datetime | None = None
+) -> None:
     db = get_database()
     db.execute(
         "UPDATE tasks SET status = ?, completed_at = ? WHERE id = ?",
         (status.value, completed_at.isoformat() if completed_at else None, task_id),
+    )
+    db.commit()
+
+
+def complete_task(task: Task, result: TaskResult) -> None:
+    """Persist terminal state and result in one transaction."""
+    db = get_database()
+    completed_at = task.completed_at or datetime.now(UTC)
+    db.execute(
+        """
+        UPDATE tasks
+        SET status = ?, completed_at = ?, session_id = ?, summary = ?, result_json = ?
+        WHERE id = ?
+        """,
+        (
+            task.status.value,
+            completed_at.isoformat(),
+            task.session_id,
+            task.summary,
+            result.model_dump_json(),
+            task.id,
+        ),
     )
     db.commit()
 
@@ -76,10 +103,11 @@ def update_task_summary(task_id: str, summary: str) -> None:
     db.commit()
 
 
-def delete_task(task_id: str) -> None:
+def delete_task(task_id: str) -> bool:
     db = get_database()
-    db.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
+    result = db.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
     db.commit()
+    return result.rowcount > 0
 
 
 def clear_history() -> None:
@@ -88,7 +116,36 @@ def clear_history() -> None:
     db.commit()
 
 
+def recover_interrupted_tasks() -> int:
+    """Mark work that could not survive a server restart as failed."""
+    db = get_database()
+    now = datetime.now(UTC).isoformat()
+    result = db.execute(
+        """
+        UPDATE tasks
+        SET status = ?, completed_at = ?, result_json = ?
+        WHERE status IN (?, ?, ?, ?, ?)
+        """,
+        (
+            TaskStatus.FAILED.value,
+            now,
+            TaskResult(
+                success=False,
+                error="SwiftAgent restarted before this task completed. Start a new task or resume its session.",
+            ).model_dump_json(),
+            TaskStatus.PENDING.value,
+            TaskStatus.QUEUED.value,
+            TaskStatus.RUNNING.value,
+            TaskStatus.WAITING_FOR_PERMISSION.value,
+            TaskStatus.WAITING_FOR_QUESTION.value,
+        ),
+    )
+    db.commit()
+    return result.rowcount
+
+
 # ── Messages ──────────────────────────────────────────────────
+
 
 def get_task_messages(task_id: str) -> list[TaskMessage]:
     db = get_database()
@@ -129,12 +186,12 @@ def add_task_message(task_id: str, message: TaskMessage) -> None:
 
 # ── Todos ─────────────────────────────────────────────────────
 
+
 def get_todos_for_task(task_id: str) -> list[TodoItem]:
     db = get_database()
     rows = db.execute("SELECT * FROM todo_items WHERE task_id = ?", (task_id,)).fetchall()
     return [
-        TodoItem(id=r["id"], content=r["content"], completed=bool(r["completed"]))
-        for r in rows
+        TodoItem(id=r["id"], content=r["content"], completed=bool(r["completed"])) for r in rows
     ]
 
 
@@ -156,6 +213,7 @@ def clear_todos_for_task(task_id: str) -> None:
 
 
 # ── Helpers ───────────────────────────────────────────────────
+
 
 def _row_to_task(row: dict) -> Task:
     config = TaskConfig.model_validate_json(row["config_json"])

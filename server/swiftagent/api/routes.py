@@ -3,21 +3,26 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import subprocess
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from swiftagent.models.settings import AppSettings
 from swiftagent.models.task import Task
 from swiftagent.storage import settings as settings_repo
 from swiftagent.storage import tasks as task_repo
 from swiftagent.tools.sandbox import check_bwrap_usable
-from swiftagent.tools.workspace import get_workspace_dir, require_workspace_path
+from swiftagent.tools.workspace import (
+    get_workspace_dir,
+    require_workspace_path,
+    write_text_atomically,
+)
 
 router = APIRouter()
 
@@ -28,8 +33,11 @@ router = APIRouter()
 
 
 @router.get("/tasks", response_model=list[Task])
-async def list_tasks():
-    return task_repo.get_tasks()
+async def list_tasks(
+    limit: int = Query(default=50, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+):
+    return task_repo.get_tasks(limit=limit, offset=offset)
 
 
 @router.get("/tasks/{task_id}", response_model=Task | None)
@@ -42,7 +50,8 @@ async def get_task(task_id: str):
 
 @router.delete("/tasks/{task_id}")
 async def delete_task(task_id: str):
-    task_repo.delete_task(task_id)
+    if not task_repo.delete_task(task_id):
+        raise HTTPException(404, "Task not found")
     return {"ok": True}
 
 
@@ -65,10 +74,12 @@ async def get_settings():
 class SettingsUpdate(BaseModel):
     debug_mode: bool | None = None
     theme: Literal["light", "dark", "system"] | None = None
-    claude_model: str | None = None
-    claude_permission_mode: str | None = None
-    claude_cli_path: str | None = None
-    workspace_dir: str | None = None
+    claude_model: str | None = Field(default=None, max_length=256)
+    claude_permission_mode: (
+        Literal["default", "acceptEdits", "dontAsk", "bypassPermissions", "plan"] | None
+    ) = None
+    claude_cli_path: str | None = Field(default=None, max_length=4_096)
+    workspace_dir: str | None = Field(default=None, max_length=4_096)
     sandbox_mode: Literal["strict", "fallback"] | None = None
 
 
@@ -90,6 +101,11 @@ async def update_settings(update: SettingsUpdate):
         if not raw_workspace:
             raise HTTPException(400, "workspace_dir cannot be empty")
         path = Path(raw_workspace).expanduser().resolve()
+        if path == path.parent or path == Path.home().resolve():
+            raise HTTPException(
+                400,
+                "workspace_dir cannot be the filesystem or home directory root; choose a dedicated workspace",
+            )
         path.mkdir(parents=True, exist_ok=True)
         settings_repo.set_workspace_dir(str(path))
     if update.sandbox_mode is not None:
@@ -170,10 +186,12 @@ async def engine_status(probe_auth: bool = Query(default=False)):
     degraded_reason = None
     if degraded:
         if not bwrap_available:
-            degraded_reason = "sandbox_mode is strict but bwrap is missing; fallback sandboxing is active"
+            degraded_reason = (
+                "Strict mode is blocked: bwrap is missing. Install bwrap or explicitly select fallback mode."
+            )
         else:
             degraded_reason = (
-                "sandbox_mode is strict but bwrap is unusable; fallback sandboxing is active"
+                "Strict mode is blocked: bwrap is unusable. Repair bwrap or explicitly select fallback mode."
             )
             if bwrap_reason:
                 degraded_reason = f"{degraded_reason} ({bwrap_reason})"
@@ -205,29 +223,52 @@ async def engine_status(probe_auth: bool = Query(default=False)):
 
 
 class FileWriteBody(BaseModel):
-    path: str
+    path: str = Field(min_length=1, max_length=4_096)
     content: str
     create_parents: bool = True
 
 
 class FileMkdirBody(BaseModel):
-    path: str
+    path: str = Field(min_length=1, max_length=4_096)
     parents: bool = True
 
 
 class FileMoveBody(BaseModel):
-    source_path: str
-    target_path: str
+    source_path: str = Field(min_length=1, max_length=4_096)
+    target_path: str = Field(min_length=1, max_length=4_096)
     create_parents: bool = True
 
 
 class FileDeleteBody(BaseModel):
-    path: str
+    path: str = Field(min_length=1, max_length=4_096)
     recursive: bool = False
 
 
 class FileReadBody(BaseModel):
-    path: str
+    path: str = Field(min_length=1, max_length=4_096)
+
+
+def _max_file_bytes() -> int:
+    raw = os.environ.get("SWIFTAGENT_MAX_FILE_BYTES", "1048576")
+    try:
+        value = int(raw)
+    except ValueError:
+        return 1_048_576
+    return min(max(value, 1_024), 25 * 1_024 * 1_024)
+
+
+def _max_directory_entries() -> int:
+    raw = os.environ.get("SWIFTAGENT_MAX_DIRECTORY_ENTRIES", "500")
+    try:
+        value = int(raw)
+    except ValueError:
+        return 500
+    return min(max(value, 10), 5_000)
+
+
+def _ensure_not_workspace_root(path: Path, action: str) -> None:
+    if path == get_workspace_dir():
+        raise HTTPException(400, f"Cannot {action} the workspace root")
 
 
 def _to_workspace_relative(path: Path) -> str:
@@ -243,16 +284,25 @@ async def files_workspace():
 
 
 @router.get("/files/list")
-async def files_list(path: str = Query(default=".")):
+async def files_list(
+    path: str = Query(default="."),
+    limit: int = Query(default=200, ge=1, le=5_000),
+):
     directory = require_workspace_path(path)
     if not directory.exists():
         raise HTTPException(404, "Directory not found")
     if not directory.is_dir():
         raise HTTPException(400, "Path is not a directory")
 
+    safe_limit = min(limit, _max_directory_entries())
     entries = []
-    for entry in sorted(directory.iterdir(), key=lambda p: (not p.is_dir(), p.name.lower())):
-        stat = entry.stat()
+    ordered_entries = sorted(directory.iterdir(), key=lambda p: (not p.is_dir(), p.name.lower()))
+    for entry in ordered_entries[:safe_limit]:
+        try:
+            stat = entry.stat()
+        except OSError:
+            # A file can disappear between listing and stat; omit it rather than failing the whole view.
+            continue
         entries.append(
             {
                 "name": entry.name,
@@ -265,8 +315,11 @@ async def files_list(path: str = Query(default=".")):
 
     return {
         "path": _to_workspace_relative(directory),
-        "parent": None if directory == get_workspace_dir() else _to_workspace_relative(directory.parent),
+        "parent": None
+        if directory == get_workspace_dir()
+        else _to_workspace_relative(directory.parent),
         "entries": entries,
+        "truncated": len(ordered_entries) > safe_limit,
     }
 
 
@@ -275,6 +328,12 @@ async def files_read(body: FileReadBody):
     file_path = require_workspace_path(body.path)
     if not file_path.exists() or not file_path.is_file():
         raise HTTPException(404, "File not found")
+    size = file_path.stat().st_size
+    if size > _max_file_bytes():
+        raise HTTPException(
+            413,
+            f"File is too large to open in SwiftAgent ({size} bytes; limit is {_max_file_bytes()} bytes)",
+        )
 
     try:
         content = file_path.read_text(encoding="utf-8")
@@ -294,7 +353,18 @@ async def files_write(body: FileWriteBody):
         raise HTTPException(400, "Cannot overwrite a directory with file content")
     if body.create_parents:
         file_path.parent.mkdir(parents=True, exist_ok=True)
-    file_path.write_text(body.content, encoding="utf-8")
+    size = len(body.content.encode("utf-8"))
+    if size > _max_file_bytes():
+        raise HTTPException(
+            413,
+            f"File content is too large to save ({size} bytes; limit is {_max_file_bytes()} bytes)",
+        )
+    try:
+        write_text_atomically(file_path, body.content)
+    except OSError as exc:
+        raise HTTPException(
+            500, "Could not save file. Check workspace permissions and free space."
+        ) from exc
 
     return {"ok": True, "path": _to_workspace_relative(file_path)}
 
@@ -302,7 +372,12 @@ async def files_write(body: FileWriteBody):
 @router.post("/files/mkdir")
 async def files_mkdir(body: FileMkdirBody):
     directory = require_workspace_path(body.path)
-    directory.mkdir(parents=body.parents, exist_ok=True)
+    try:
+        directory.mkdir(parents=body.parents, exist_ok=True)
+    except OSError as exc:
+        raise HTTPException(
+            409, "Could not create directory. Check its parent path and permissions."
+        ) from exc
     return {"ok": True, "path": _to_workspace_relative(directory)}
 
 
@@ -312,11 +387,23 @@ async def files_move(body: FileMoveBody):
     target = require_workspace_path(body.target_path)
     if not source.exists():
         raise HTTPException(404, "Source path not found")
+    _ensure_not_workspace_root(source, "move")
+    if source == target:
+        raise HTTPException(400, "Source and target paths must be different")
+    if target.exists():
+        raise HTTPException(409, "Target path already exists; choose a new name")
+    if source.is_dir() and source in target.parents:
+        raise HTTPException(400, "Cannot move a directory into itself")
 
     if body.create_parents:
         target.parent.mkdir(parents=True, exist_ok=True)
 
-    source.rename(target)
+    try:
+        source.rename(target)
+    except OSError as exc:
+        raise HTTPException(
+            409, "Could not move this path. Check the target parent and permissions."
+        ) from exc
     return {
         "ok": True,
         "source_path": _to_workspace_relative(source),
@@ -329,14 +416,24 @@ async def files_delete(body: FileDeleteBody):
     path = require_workspace_path(body.path)
     if not path.exists():
         raise HTTPException(404, "Path not found")
+    _ensure_not_workspace_root(path, "delete")
 
     if path.is_dir():
-        if body.recursive:
-            shutil.rmtree(path)
-        else:
-            path.rmdir()
+        try:
+            if body.recursive:
+                shutil.rmtree(path)
+            else:
+                path.rmdir()
+        except OSError as exc:
+            raise HTTPException(
+                409,
+                "Directory is not empty or could not be removed. Enable recursive deletion only after reviewing its contents.",
+            ) from exc
     else:
-        path.unlink()
+        try:
+            path.unlink()
+        except OSError as exc:
+            raise HTTPException(409, "Could not delete file. Check workspace permissions.") from exc
 
     return {"ok": True, "path": _to_workspace_relative(path)}
 

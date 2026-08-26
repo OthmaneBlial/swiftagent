@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
 import shutil
-from datetime import datetime, UTC
+import signal
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -19,6 +21,9 @@ from swiftagent.tools.workspace import get_workspace_dir
 
 if TYPE_CHECKING:
     from swiftagent.api.websocket import ConnectionManager
+
+
+logger = logging.getLogger(__name__)
 
 
 class ClaudeAdapter:
@@ -43,7 +48,9 @@ class ClaudeAdapter:
 
     @property
     def running(self) -> bool:
-        return self._process is not None and self._process.returncode is None and not self._completed
+        return (
+            self._process is not None and self._process.returncode is None and not self._completed
+        )
 
     @property
     def session_id(self) -> str | None:
@@ -57,7 +64,11 @@ class ClaudeAdapter:
         if not claude_path:
             raise RuntimeError("Claude CLI not found. Install Claude Code first.")
 
-        workspace = get_workspace_dir()
+        workspace = (
+            Path(self.task.config.working_directory)
+            if self.task.config.working_directory
+            else get_workspace_dir()
+        )
         env = self._build_env()
         command, sandbox_notice = self._build_command(claude_path, workspace)
 
@@ -74,7 +85,7 @@ class ClaudeAdapter:
         )
 
         if sandbox_notice:
-            print(f"[Sandbox] {sandbox_notice}")
+            logger.warning("sandbox_notice task_id=%s message=%s", self.task.id, sandbox_notice)
             await self.manager.broadcast(
                 WSEvent(
                     type=WSEventType.TASK_PROGRESS,
@@ -89,6 +100,7 @@ class ClaudeAdapter:
             stderr=asyncio.subprocess.PIPE,
             env=env,
             cwd=str(workspace),
+            start_new_session=True,
         )
 
         self._stdout_task = asyncio.create_task(self._read_stdout())
@@ -110,7 +122,7 @@ class ClaudeAdapter:
         if self._stdout_task:
             try:
                 await asyncio.wait_for(self._stdout_task, timeout=3)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 pass
 
         if self._completed:
@@ -153,7 +165,7 @@ class ClaudeAdapter:
                     break
                 text = line.decode("utf-8", errors="replace").strip()
                 if text:
-                    print(f"[Claude stderr] {text}")
+                    logger.warning("claude_stderr task_id=%s message=%s", self.task.id, text)
         except Exception:
             pass
 
@@ -275,17 +287,12 @@ class ClaudeAdapter:
             status = TaskStatus.COMPLETED if success else TaskStatus.FAILED
             result = TaskResult(success=success, error=error, summary=summary)
 
-            task_repo.update_task_status(self.task.id, status, now)
-            if summary:
-                task_repo.update_task_summary(self.task.id, summary)
-            if self._session_id:
-                task_repo.update_task_session_id(self.task.id, self._session_id)
-
             self.task.status = status
             self.task.result = result
             self.task.completed_at = now
             self.task.summary = summary
             self.task.session_id = self._session_id
+            task_repo.complete_task(self.task, result)
 
             await self.manager.broadcast(
                 WSEvent(
@@ -303,11 +310,17 @@ class ClaudeAdapter:
 
     async def cancel(self) -> None:
         if self._process and self._process.returncode is None:
-            self._process.terminate()
+            try:
+                os.killpg(self._process.pid, signal.SIGTERM)
+            except (ProcessLookupError, PermissionError):
+                self._process.terminate()
             try:
                 await asyncio.wait_for(self._process.wait(), timeout=5)
-            except asyncio.TimeoutError:
-                self._process.kill()
+            except TimeoutError:
+                try:
+                    os.killpg(self._process.pid, signal.SIGKILL)
+                except (ProcessLookupError, PermissionError):
+                    self._process.kill()
 
         async with self._completion_lock:
             if self._completed:
@@ -315,9 +328,10 @@ class ClaudeAdapter:
             self._completed = True
 
             now = datetime.now(UTC)
-            task_repo.update_task_status(self.task.id, TaskStatus.CANCELLED, now)
             self.task.status = TaskStatus.CANCELLED
             self.task.completed_at = now
+            self.task.result = TaskResult(success=False, error="Task cancelled")
+            task_repo.complete_task(self.task, self.task.result)
 
         await self.manager.broadcast(
             WSEvent(
@@ -336,8 +350,8 @@ class ClaudeAdapter:
         self._disposed = True
         if self._process and self._process.returncode is None:
             try:
-                self._process.kill()
-            except ProcessLookupError:
+                os.killpg(self._process.pid, signal.SIGKILL)
+            except (ProcessLookupError, PermissionError):
                 pass
 
     # ── command building ───────────────────────────────────────
@@ -372,19 +386,16 @@ class ClaudeAdapter:
         bwrap_path = shutil.which("bwrap")
         if sandbox_mode == "strict":
             if not bwrap_path:
-                return (
-                    [claude_path, *args],
-                    "Strict sandbox requested but bwrap is not installed. Falling back to guarded mode.",
+                raise RuntimeError(
+                    "Strict sandbox is unavailable because bwrap is not installed. "
+                    "Install bwrap, or explicitly select fallback mode in Settings after reviewing its warning."
                 )
 
             bwrap_usable, reason = check_bwrap_usable(workspace)
             if not bwrap_usable:
-                return (
-                    [claude_path, *args],
-                    (
-                        "Strict sandbox requested but bwrap is unavailable in this environment "
-                        f"({reason or 'unknown error'}). Falling back to guarded mode."
-                    ),
+                raise RuntimeError(
+                    "Strict sandbox is unavailable in this environment "
+                    f"({reason or 'unknown error'}). Install or enable bwrap, or explicitly select fallback mode in Settings."
                 )
 
             claude_dir = Path.home() / ".claude"
@@ -421,7 +432,10 @@ class ClaudeAdapter:
                 None,
             )
 
-        return [claude_path, *args], None
+        return (
+            [claude_path, *args],
+            "Fallback mode is active. Claude is not OS-isolated; use only with a workspace and account you trust.",
+        )
 
     def _build_env(self) -> dict[str, str]:
         env = os.environ.copy()

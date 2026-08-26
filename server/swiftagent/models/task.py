@@ -7,14 +7,17 @@ Ported from base/accomplish/packages/agent-core/src/common/types/task.ts
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
-from enum import Enum
-from typing import Any, Optional
+from datetime import UTC, datetime
+from enum import StrEnum
+from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+MAX_PROMPT_CHARS = 50_000
+MAX_ATTACHMENTS = 32
 
 
-class TaskStatus(str, Enum):
+class TaskStatus(StrEnum):
     PENDING = "pending"
     QUEUED = "queued"
     RUNNING = "running"
@@ -31,7 +34,7 @@ class TaskMessage(BaseModel):
     id: str = Field(default_factory=lambda: uuid.uuid4().hex[:12])
     role: str  # "user" | "assistant" | "system" | "tool"
     content: str
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
     metadata: dict[str, Any] | None = None
 
 
@@ -47,10 +50,26 @@ class TaskAttachment(BaseModel):
 class TaskConfig(BaseModel):
     """Configuration to start a new task."""
 
-    prompt: str
-    working_directory: str | None = None
-    attachments: list[TaskAttachment] = Field(default_factory=list)
-    model_id: str | None = None
+    prompt: str = Field(min_length=1, max_length=MAX_PROMPT_CHARS)
+    working_directory: str | None = Field(default=None, max_length=4_096)
+    attachments: list[TaskAttachment] = Field(default_factory=list, max_length=MAX_ATTACHMENTS)
+    model_id: str | None = Field(default=None, max_length=256)
+
+    @field_validator("prompt")
+    @classmethod
+    def normalize_prompt(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("Prompt cannot be empty")
+        return normalized
+
+    @field_validator("working_directory", "model_id")
+    @classmethod
+    def normalize_optional_text(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip()
+        return normalized or None
 
 
 class TaskResult(BaseModel):
@@ -71,7 +90,7 @@ class Task(BaseModel):
     result: TaskResult | None = None
     session_id: str | None = None
     summary: str | None = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     completed_at: datetime | None = None
 
 

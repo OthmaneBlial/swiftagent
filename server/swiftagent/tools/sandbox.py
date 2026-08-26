@@ -21,9 +21,8 @@ def _cache_valid(bwrap_path: str | None, workspace: Path) -> bool:
     checked_at = float(_bwrap_cache.get("checked_at", 0.0))
     if time.monotonic() - checked_at > _BWRAP_CACHE_TTL_SEC:
         return False
-    return (
-        _bwrap_cache.get("path") == bwrap_path
-        and _bwrap_cache.get("workspace") == str(workspace)
+    return _bwrap_cache.get("path") == bwrap_path and _bwrap_cache.get("workspace") == str(
+        workspace
     )
 
 
@@ -57,8 +56,7 @@ def check_bwrap_usable(workspace: Path) -> tuple[bool, str | None]:
     try:
         proc = subprocess.run(
             probe,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            capture_output=True,
             text=True,
             timeout=8,
             check=False,

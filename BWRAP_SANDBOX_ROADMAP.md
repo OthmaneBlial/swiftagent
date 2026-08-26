@@ -5,7 +5,7 @@
 SwiftAgent currently supports two runtime safety modes:
 
 - `strict`: Claude runs inside `bwrap` (OS sandbox)
-- `fallback`: Claude runs without OS isolation (still workspace-guarded for app file APIs)
+- `fallback`: Claude runs without OS isolation after an explicit user choice
 
 Right now, this machine reports:
 
@@ -13,7 +13,7 @@ Right now, this machine reports:
 - `bwrap_usable = false`
 - reason: `bwrap: setting up uid map: Permission denied`
 
-So strict sandboxing is **configured** but **not active** yet.
+So `strict` tasks will now **fail before launch** rather than silently falling back. This is intentional: the Files API's workspace guard cannot isolate an unsandboxed Claude process.
 
 ---
 
@@ -111,7 +111,7 @@ curl -s http://127.0.0.1:8000/api/engine/status?probe_auth=false
 - `strict_sandbox_active: true`
 - `degraded: false`
 
-4. Run a normal task and make sure no fallback warning appears in server logs.
+4. Run a normal task and make sure no sandbox failure appears in server logs.
 
 ---
 
@@ -119,13 +119,15 @@ curl -s http://127.0.0.1:8000/api/engine/status?probe_auth=false
 
 After strict mode works, implement these improvements:
 
-1. Add a startup policy option: fail fast if `sandbox_mode=strict` but sandbox is degraded.
-2. Add a UI warning badge when runtime is degraded (already exposed by engine status API).
-3. Add regression test coverage for:
-   - strict active path
-   - strict requested but unusable path
-   - fallback path behavior
-4. Add integration test that a task cannot write outside workspace in strict mode.
+Implemented:
+
+1. Strict task launch fails closed when `bwrap` is missing or unusable.
+2. Engine status exposes degraded strict-mode state in the UI.
+3. Regression coverage verifies that strict mode never silently downgrades.
+
+Remaining:
+
+1. Add a host-level integration test that a strict task cannot write outside its workspace.
 
 ---
 
@@ -144,4 +146,3 @@ SWIFTAGENT_SANDBOX_MODE=fallback
 ```
 
 Use this only as temporary operational mode until strict sandbox is fixed.
-

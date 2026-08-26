@@ -40,6 +40,7 @@ def _default_workspace_dir() -> str:
 
 # ── Typed accessors ───────────────────────────────────────────
 
+
 def get_debug_mode() -> bool:
     return _get("debug_mode", "0") == "1"
 

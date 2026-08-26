@@ -7,14 +7,14 @@ replacing Electron IPC events (task:update, thought:stream, permission:request).
 
 from __future__ import annotations
 
-from datetime import datetime
-from enum import Enum
-from typing import Any, Optional
+from datetime import UTC, datetime
+from enum import StrEnum
+from typing import Any
 
 from pydantic import BaseModel, Field
 
 
-class WSEventType(str, Enum):
+class WSEventType(StrEnum):
     # Server → Client
     TASK_STARTED = "task:started"
     TASK_MESSAGE = "task:message"
@@ -44,7 +44,7 @@ class WSEvent(BaseModel):
     type: WSEventType
     payload: dict[str, Any] = Field(default_factory=dict)
     task_id: str | None = None
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class PermissionRequest(BaseModel):

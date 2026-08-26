@@ -147,6 +147,14 @@ export default function Settings() {
                             <option value="fallback">fallback</option>
                         </select>
                     </label>
+                    <p className="text-xs text-muted-foreground">
+                        Strict blocks a task if OS isolation is unavailable. Fallback is an explicit, unisolated mode for a trusted local machine.
+                    </p>
+                    {engineStatus?.degraded ? (
+                        <div role="alert" className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-200">
+                            <strong>Tasks are blocked in strict mode.</strong> {engineStatus.degraded_reason}
+                        </div>
+                    ) : null}
                 </section>
 
                 <section className="rounded-xl border border-border bg-card p-4 space-y-4">

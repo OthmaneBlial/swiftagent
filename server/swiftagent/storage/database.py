@@ -9,13 +9,12 @@ from __future__ import annotations
 
 import sqlite3
 import threading
-from pathlib import Path
 
 _db: sqlite3.Connection | None = None
 _db_path: str | None = None
-_lock = threading.Lock()
+_lock = threading.RLock()
 
-CURRENT_SCHEMA_VERSION = 1
+CURRENT_SCHEMA_VERSION = 2
 
 
 def init_database(db_path: str) -> sqlite3.Connection:
@@ -37,6 +36,7 @@ def init_database(db_path: str) -> sqlite3.Connection:
         # Enable WAL mode and foreign keys (same as original)
         _db.execute("PRAGMA journal_mode = WAL")
         _db.execute("PRAGMA foreign_keys = ON")
+        _db.execute("PRAGMA busy_timeout = 5000")
 
         _run_migrations(_db)
         print("[DB] Database initialized and migrations complete")
@@ -81,10 +81,13 @@ def _run_migrations(db: sqlite3.Connection) -> None:
 
     if current_version < 1:
         _migrate_v1(db)
-        if current_version == 0:
-            db.execute("INSERT INTO schema_version (version) VALUES (?)", (CURRENT_SCHEMA_VERSION,))
-        else:
-            db.execute("UPDATE schema_version SET version = ?", (CURRENT_SCHEMA_VERSION,))
+    if current_version < 2:
+        _migrate_v2(db)
+
+    if current_version == 0:
+        db.execute("INSERT INTO schema_version (version) VALUES (?)", (CURRENT_SCHEMA_VERSION,))
+    elif current_version < CURRENT_SCHEMA_VERSION:
+        db.execute("UPDATE schema_version SET version = ?", (CURRENT_SCHEMA_VERSION,))
 
     db.commit()
 
@@ -151,3 +154,11 @@ def _migrate_v1(db: sqlite3.Connection) -> None:
     # Create indexes
     db.execute("CREATE INDEX IF NOT EXISTS idx_messages_task ON task_messages(task_id)")
     db.execute("CREATE INDEX IF NOT EXISTS idx_todos_task ON todo_items(task_id)")
+
+
+def _migrate_v2(db: sqlite3.Connection) -> None:
+    """Indexes for bounded history and interrupted-task recovery."""
+    db.execute("CREATE INDEX IF NOT EXISTS idx_tasks_created_at ON tasks(created_at DESC)")
+    db.execute(
+        "CREATE INDEX IF NOT EXISTS idx_tasks_status_created_at ON tasks(status, created_at DESC)"
+    )

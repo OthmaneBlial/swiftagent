@@ -9,7 +9,6 @@ Usage:
 
 from __future__ import annotations
 
-import os
 import shutil
 import subprocess
 import sys
@@ -176,8 +175,12 @@ def onboard_interactive() -> None:
     env_values["SWIFTAGENT_WORKSPACE_DIR"] = workspace or workspace_default
 
     sandbox_default = env_values.get("SWIFTAGENT_SANDBOX_MODE", "strict")
-    sandbox = input(f"  Sandbox mode [strict/fallback] (default: {sandbox_default}): ").strip().lower()
-    env_values["SWIFTAGENT_SANDBOX_MODE"] = sandbox if sandbox in {"strict", "fallback"} else sandbox_default
+    sandbox = (
+        input(f"  Sandbox mode [strict/fallback] (default: {sandbox_default}): ").strip().lower()
+    )
+    env_values["SWIFTAGENT_SANDBOX_MODE"] = (
+        sandbox if sandbox in {"strict", "fallback"} else sandbox_default
+    )
 
     _write_env(env_path, env_values)
 

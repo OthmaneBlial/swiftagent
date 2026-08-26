@@ -41,6 +41,7 @@ ENV/
 # dotenv
 .env
 .env.*
+!.env.example
 
 # pytest / coverage
 htmlcov/
@@ -58,6 +59,7 @@ coverage.xml
 
 # mypy
 .mypy_cache/
+.ruff_cache/
 
 # Logs
 *.log
@@ -65,3 +67,7 @@ coverage.xml
 # OS files
 .DS_Store
 Thumbs.db
+
+# Local SwiftAgent data and frontend artifacts
+.swiftagent/
+client/dist/

@@ -129,6 +129,11 @@ A passing JSON report is test evidence, not endorsement. Submit it with the
 compatibility template and security checklist. Built-in or community trust is
 assigned by SwiftAgent review policy, never by a manifest assertion.
 
+Trust fields are deliberately absent from the public manifest schema. Every
+manifest-loaded integration remains `local custom`, including one with a passing
+compatibility declaration. See the [adapter trust policy](ADAPTER_TRUST.md) for
+the separate maintainer review gate.
+
 ## First adapter walkthrough
 
 1. Copy `adapter-kit/example-adapter/`.

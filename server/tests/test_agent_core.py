@@ -7,8 +7,9 @@ from datetime import UTC, datetime
 
 import pytest
 
-from swiftagent.agents.registry import AgentRegistry
+from swiftagent.agents.registry import AgentRegistry, agent_registry
 from swiftagent.models.agent import (
+    AdapterTrustLevel,
     AgentCapabilities,
     AgentDefinition,
     AgentEvent,
@@ -83,6 +84,56 @@ def test_agent_registry_rejects_duplicates_and_unknown_agents():
         registry.definition("missing-agent")
 
 
+def test_verified_trust_requires_maintainer_evidence_and_builtins_are_explicit() -> None:
+    with pytest.raises(ValueError, match="requires maintainer-assigned evidence"):
+        AgentDefinition(
+            agent_id="community-agent",
+            display_name="Community Agent",
+            adapter_id="community-adapter",
+            adapter_version="1.0.0",
+            protocol="acp-v1",
+            trust_level="community_verified",
+            capabilities=AgentCapabilities(),
+        )
+
+    with pytest.raises(ValueError, match="cannot attach SwiftAgent trust evidence"):
+        AgentDefinition(
+            agent_id="local-agent",
+            display_name="Local Agent",
+            adapter_id="local-adapter",
+            adapter_version="1.0.0",
+            protocol="acp-v1",
+            trust_level="local_custom",
+            trust_evidence="https://example.invalid/self-claim",
+            capabilities=AgentCapabilities(),
+        )
+
+    community = AgentDefinition(
+        agent_id="community-agent",
+        display_name="Community Agent",
+        adapter_id="community-adapter",
+        adapter_version="1.0.0",
+        protocol="acp-v1",
+        trust_level="community_verified",
+        trust_evidence="https://example.invalid/reviewed-contract-report",
+        capabilities=AgentCapabilities(),
+    )
+    community_status = AgentStatus(
+        **community.model_dump(),
+        installed=True,
+        compatible=True,
+    )
+    assert community_status.trust_level is AdapterTrustLevel.COMMUNITY_VERIFIED
+    assert community_status.trust_evidence == community.trust_evidence
+
+    definitions = agent_registry.definitions()
+    assert definitions
+    assert {definition.trust_level for definition in definitions} == {
+        AdapterTrustLevel.BUILT_IN_VERIFIED
+    }
+    assert all(definition.trust_evidence for definition in definitions)
+
+
 def test_agent_registry_status_cache_and_capability_combinations():
     registry = AgentRegistry()
     calls: list[str] = []
@@ -142,6 +193,8 @@ def test_agents_endpoint_and_default_agent_setting(client, monkeypatch):
     assert response.json()["adapter_api_version"] == "1.0"
     assert response.json()["load_errors"] == []
     assert response.json()["agents"][0]["agent_id"] == "fixture-agent"
+    assert response.json()["agents"][0]["trust_level"] == "local_custom"
+    assert response.json()["agents"][0]["trust_evidence"] is None
     assert response.json()["agents"][0]["capabilities"]["tool_events"] is True
 
     unknown = client.put("/api/settings", json={"default_agent_id": "missing-agent"})

@@ -26,6 +26,24 @@ const capabilityLabels: Array<[keyof AgentStatus['capabilities'], string]> = [
     ['usage', 'Usage'],
 ];
 
+const trustPresentation: Record<AgentStatus['trust_level'], { label: string; detail: string; tone: string }> = {
+    built_in_verified: {
+        label: 'Built-in verified',
+        detail: 'Maintained in SwiftAgent and covered by the release test suite.',
+        tone: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
+    },
+    community_verified: {
+        label: 'Community verified',
+        detail: 'Externally maintained and contract-tested only for the listed versions.',
+        tone: 'border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-300',
+    },
+    local_custom: {
+        label: 'Local custom',
+        detail: 'Configured on this machine and not endorsed by SwiftAgent.',
+        tone: 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300',
+    },
+};
+
 function readiness(agent: AgentStatus) {
     if (!agent.installed) {
         return { label: 'Not installed', tone: 'text-muted-foreground', Icon: PlugsConnected };
@@ -39,6 +57,7 @@ function readiness(agent: AgentStatus) {
 export default function AgentCard({ agent, selected = false, onSelect }: AgentCardProps) {
     const state = readiness(agent);
     const StateIcon = state.Icon;
+    const trust = trustPresentation[agent.trust_level] ?? trustPresentation.local_custom;
     const enabledCapabilities = capabilityLabels.filter(([key]) => Boolean(agent.capabilities[key]));
 
     return (
@@ -57,6 +76,14 @@ export default function AgentCard({ agent, selected = false, onSelect }: AgentCa
                         <span className={`inline-flex items-center gap-1 text-[11px] font-medium ${state.tone}`}>
                             <StateIcon weight="bold" className="h-3 w-3" />
                             {state.label}
+                        </span>
+                        <span
+                            className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold ${trust.tone}`}
+                            title={trust.detail}
+                            aria-label={`${trust.label}. ${trust.detail}`}
+                        >
+                            <ShieldCheck weight="fill" className="h-3 w-3" />
+                            {trust.label}
                         </span>
                     </div>
                     <p className="mt-0.5 truncate text-xs text-muted-foreground">
@@ -105,6 +132,17 @@ export default function AgentCard({ agent, selected = false, onSelect }: AgentCa
                 <p className="mt-3 border-t border-border pt-3 text-[11px] leading-relaxed text-muted-foreground">
                     {agent.detail}
                 </p>
+            ) : null}
+
+            {agent.trust_evidence ? (
+                <a
+                    href={agent.trust_evidence}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                >
+                    Review trust evidence <ArrowSquareOut className="h-3 w-3" />
+                </a>
             ) : null}
 
             {!agent.installed && agent.install_url ? (

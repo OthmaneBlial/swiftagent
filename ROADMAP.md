@@ -524,6 +524,8 @@ without editing the application core.
 
 ### 3.2 Define adapter trust levels
 
+**Status: completed, validated, and pushed.**
+
 Use visible labels:
 
 - **built-in verified:** maintained in the repository and release-tested;

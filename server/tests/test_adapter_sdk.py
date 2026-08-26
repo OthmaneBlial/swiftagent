@@ -95,6 +95,8 @@ def test_local_manifest_registers_without_core_edits_and_forwards_only_allowlist
 
     assert errors == []
     assert definition.adapter_id == "example-acp-v1"
+    assert definition.trust_level == "local_custom"
+    assert definition.trust_evidence is None
     assert statuses[0].installed is True
     assert statuses[0].version == "1.0.0"
     assert adapter._environment["EXAMPLE_ALLOWED"] == "visible-to-adapter"  # noqa: SLF001

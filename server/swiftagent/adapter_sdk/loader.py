@@ -107,6 +107,8 @@ def register_manifest(
         adapter_id=manifest.adapter_id,
         adapter_version=manifest.adapter_version,
         protocol=manifest.protocol,
+        trust_level="local_custom",
+        trust_evidence=None,
         install_url=manifest.install_url,
         documentation_url=manifest.documentation_url,
         capabilities=manifest.capabilities,

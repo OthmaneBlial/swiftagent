@@ -26,6 +26,12 @@ importing third-party code into FastAPI. The loader scans only the local adapter
 directory at startup, rejects ID collisions and incompatible schemas, forwards
 an explicit environment allowlist, and never downloads or updates commands.
 
+Adapter provenance is a separate registry-owned contract. In-repository entries
+are `built_in_verified`, a future reviewed external entry may be
+`community_verified` only with maintainer-assigned evidence, and manifest-loaded
+entries are always `local_custom`. Trust never implies that authentication,
+agent output, native safety, or SwiftAgent isolation is verified.
+
 ## Storage and boundaries
 
 - SQLite database: `~/.swiftagent/swiftagent.db` by default, configurable with `SWIFTAGENT_DATA_DIR`.

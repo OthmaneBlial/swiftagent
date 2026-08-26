@@ -4,6 +4,8 @@ All notable changes are documented here. This project follows semantic versionin
 
 ## Unreleased
 
+- Add backend-enforced and UI-visible adapter trust levels: built-in verified, community verified for exact reviewed evidence, and non-endorsed local custom.
+- Keep trust assignment outside local manifests and document a no-auto-download policy plus signature, provenance, ownership, update, and install-confirmation gates for any future registry.
 - Publish Adapter API 1.0 with a strict local manifest loader, deterministic ACP fake agent, executable contract suite, event fixtures, JSON schema, security checklist, compatibility report, and contributor documentation.
 - Surface adapter API identity and skipped local-manifest errors in Settings while keeping external commands out of process, environment-allowlisted, collision-safe, and never auto-downloaded.
 - Add durable Local Run Receipts with normalized/native event evidence, separate safety layers, Git impact, explicit verification status, and JSON/Markdown export.

@@ -226,6 +226,8 @@ export interface AgentStatus {
     adapter_id: string;
     adapter_version: string;
     protocol: string;
+    trust_level: 'built_in_verified' | 'community_verified' | 'local_custom';
+    trust_evidence: string | null;
     install_url: string | null;
     documentation_url: string | null;
     installed: boolean;

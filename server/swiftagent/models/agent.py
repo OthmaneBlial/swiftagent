@@ -6,7 +6,15 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
+
+
+class AdapterTrustLevel(StrEnum):
+    """Maintainer-assigned adapter provenance, separate from runtime safety."""
+
+    BUILT_IN_VERIFIED = "built_in_verified"
+    COMMUNITY_VERIFIED = "community_verified"
+    LOCAL_CUSTOM = "local_custom"
 
 
 class AgentCapabilities(BaseModel):
@@ -38,9 +46,21 @@ class AgentDefinition(BaseModel):
     adapter_id: str = Field(pattern=r"^[a-z0-9][a-z0-9-]{0,63}$")
     adapter_version: str = Field(min_length=1, max_length=64)
     protocol: str = Field(min_length=1, max_length=64)
+    trust_level: AdapterTrustLevel = AdapterTrustLevel.LOCAL_CUSTOM
+    trust_evidence: str | None = Field(default=None, min_length=1, max_length=2_048)
     install_url: str | None = None
     documentation_url: str | None = None
     capabilities: AgentCapabilities
+
+    @model_validator(mode="after")
+    def require_review_evidence_for_verified_trust(self) -> AgentDefinition:
+        if self.trust_level is AdapterTrustLevel.LOCAL_CUSTOM:
+            if self.trust_evidence is not None:
+                raise ValueError("Local custom adapters cannot attach SwiftAgent trust evidence")
+            return self
+        if self.trust_evidence is None:
+            raise ValueError("Verified adapter trust requires maintainer-assigned evidence")
+        return self
 
 
 class AgentModelOption(BaseModel):
@@ -59,6 +79,8 @@ class AgentStatus(BaseModel):
     adapter_id: str
     adapter_version: str
     protocol: str
+    trust_level: AdapterTrustLevel = AdapterTrustLevel.LOCAL_CUSTOM
+    trust_evidence: str | None = Field(default=None, min_length=1, max_length=2_048)
     install_url: str | None = None
     documentation_url: str | None = None
     installed: bool
@@ -72,6 +94,16 @@ class AgentStatus(BaseModel):
     checked_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     capabilities: AgentCapabilities
     models: list[AgentModelOption] = Field(default_factory=list, max_length=256)
+
+    @model_validator(mode="after")
+    def preserve_trust_evidence_invariant(self) -> AgentStatus:
+        if self.trust_level is AdapterTrustLevel.LOCAL_CUSTOM:
+            if self.trust_evidence is not None:
+                raise ValueError("Local custom adapters cannot attach SwiftAgent trust evidence")
+            return self
+        if self.trust_evidence is None:
+            raise ValueError("Verified adapter trust requires maintainer-assigned evidence")
+        return self
 
 
 class AgentEventType(StrEnum):

@@ -162,6 +162,10 @@ export default function Settings() {
                             </ul>
                         </div>
                     ) : null}
+                    <p className="text-xs leading-relaxed text-muted-foreground">
+                        Trust labels describe who maintains and tests an adapter. They do not guarantee an agent&apos;s output,
+                        authentication state, or active sandbox.
+                    </p>
                     <div className="grid gap-3">
                         {agents.map((agent) => (
                             <AgentCard

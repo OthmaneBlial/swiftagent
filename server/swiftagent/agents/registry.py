@@ -11,6 +11,9 @@ from swiftagent.models.task import Task
 
 AdapterFactory = Callable[[Task, Any], AgentAdapter]
 StatusProvider = Callable[[AgentDefinition], AgentStatus]
+BUILT_IN_TRUST_EVIDENCE = (
+    "https://github.com/OthmaneBlial/swiftagent/blob/main/docs/COMPATIBILITY.md"
+)
 
 
 class AgentRegistry:
@@ -141,6 +144,8 @@ agent_registry.register(
         adapter_id="claude-stream-json",
         adapter_version="0.3.0",
         protocol="stream-json",
+        trust_level="built_in_verified",
+        trust_evidence=BUILT_IN_TRUST_EVIDENCE,
         install_url="https://docs.anthropic.com/en/docs/claude-code/setup",
         documentation_url="https://docs.anthropic.com/en/docs/claude-code/overview",
         capabilities=AgentCapabilities(
@@ -165,6 +170,8 @@ agent_registry.register(
         adapter_id="acp-v1",
         adapter_version="0.4.0",
         protocol="acp-v1",
+        trust_level="built_in_verified",
+        trust_evidence=BUILT_IN_TRUST_EVIDENCE,
         install_url="https://agentclientprotocol.com/get-started/introduction",
         documentation_url="https://agentclientprotocol.com/protocol/overview",
         capabilities=AgentCapabilities(
@@ -188,6 +195,8 @@ agent_registry.register(
         adapter_id="codex-app-server-v2",
         adapter_version="0.4.0",
         protocol="codex-app-server-v2",
+        trust_level="built_in_verified",
+        trust_evidence=BUILT_IN_TRUST_EVIDENCE,
         install_url="https://learn.chatgpt.com/docs/codex-cli",
         documentation_url="https://learn.chatgpt.com/docs/app-server",
         capabilities=AgentCapabilities(
@@ -216,6 +225,8 @@ agent_registry.register(
         adapter_id="opencode-acp-v1",
         adapter_version="0.4.0",
         protocol="acp-v1",
+        trust_level="built_in_verified",
+        trust_evidence=BUILT_IN_TRUST_EVIDENCE,
         install_url="https://opencode.ai/docs/",
         documentation_url="https://opencode.ai/docs/acp/",
         capabilities=AgentCapabilities(
@@ -245,6 +256,8 @@ agent_registry.register(
         adapter_id="literal-subprocess-v1",
         adapter_version="0.4.0",
         protocol="literal-subprocess",
+        trust_level="built_in_verified",
+        trust_evidence=BUILT_IN_TRUST_EVIDENCE,
         documentation_url=(
             "https://github.com/OthmaneBlial/swiftagent/blob/main/docs/GENERIC_COMMAND_ADAPTER.md"
         ),

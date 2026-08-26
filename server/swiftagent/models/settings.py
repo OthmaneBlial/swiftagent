@@ -26,5 +26,7 @@ class AppSettings(BaseModel):
         "workspace-write"
     )
     codex_allow_dangerous_bypass: bool = False
+    opencode_model: str | None = None
+    opencode_cli_path: str | None = None
     workspace_dir: str
     sandbox_mode: Literal["strict", "fallback"] = "strict"

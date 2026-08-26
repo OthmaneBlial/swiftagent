@@ -322,6 +322,48 @@ export default function Settings() {
                     </details>
                 ) : null}
 
+                {agents.some((agent) => agent.agent_id === 'opencode') ? (
+                    <details className="rounded-2xl border border-border bg-card p-5">
+                        <summary className="cursor-pointer text-sm font-semibold text-foreground">OpenCode adapter options</summary>
+                        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                            <label className="space-y-1.5">
+                                <span className="text-xs text-muted-foreground">Model override</span>
+                                {agents.find((agent) => agent.agent_id === 'opencode')?.models.length ? (
+                                    <select
+                                        value={settings.opencode_model ?? ''}
+                                        onChange={(event) => update('opencode_model', event.target.value || null)}
+                                        className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm"
+                                    >
+                                        <option value="">OpenCode default</option>
+                                        {agents.find((agent) => agent.agent_id === 'opencode')?.models.map((model) => (
+                                            <option key={model.id} value={model.id}>{model.name}</option>
+                                        ))}
+                                    </select>
+                                ) : (
+                                    <input
+                                        value={settings.opencode_model ?? ''}
+                                        onChange={(event) => update('opencode_model', event.target.value || null)}
+                                        placeholder="provider/model"
+                                        className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm"
+                                    />
+                                )}
+                            </label>
+                            <label className="space-y-1.5">
+                                <span className="text-xs text-muted-foreground">Executable path</span>
+                                <input
+                                    value={settings.opencode_cli_path ?? ''}
+                                    onChange={(event) => update('opencode_cli_path', event.target.value || null)}
+                                    placeholder="Auto-detect opencode"
+                                    className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm"
+                                />
+                            </label>
+                        </div>
+                        <p className="mt-3 text-[11px] leading-relaxed text-muted-foreground">
+                            Models come from <code>opencode models</code>. SwiftAgent prefers ACP, never enables session sharing, and labels the reduced JSON fallback when ACP is unavailable. Provider login remains owned by <code>opencode auth login</code>.
+                        </p>
+                    </details>
+                ) : null}
+
                 <div className="sticky bottom-4 flex justify-end">
                     <button
                         type="button"

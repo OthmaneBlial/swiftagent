@@ -61,6 +61,7 @@ Use [`.env.example`](.env.example) as the reference. Environment settings establ
 | `SWIFTAGENT_WORKSPACE_DIR` | `~/.swiftagent/workspace` | Dedicated root for Files and task working directories. |
 | `SWIFTAGENT_SANDBOX_MODE` | `strict` | `strict` requires working bwrap; `fallback` is explicit and unisolated. |
 | `SWIFTAGENT_ACP_COMMAND_JSON` | empty | Literal argv array for a local ACP v1 agent, for example `["your-agent", "acp"]`. |
+| `SWIFTAGENT_OPENCODE_PATH` | auto-detect | Optional OpenCode CLI path; provider login remains owned by OpenCode. |
 | `SWIFTAGENT_TASK_TIMEOUT_SEC` | `900` | Per-task timeout in seconds. |
 | `SWIFTAGENT_MAX_FILE_BYTES` | `1048576` | Maximum UTF-8 file read/write size. |
 | `SWIFTAGENT_MAX_DIRECTORY_ENTRIES` | `500` | Maximum entries returned to the file browser. |
@@ -113,7 +114,7 @@ FastAPI ── Task manager ── Agent registry ── selected local adapter
    └── SQLite history/settings and workspace-scoped file API
 ```
 
-More detail: [architecture](docs/ARCHITECTURE.md) · [ACP adapter](docs/ACP_ADAPTER.md) · [Codex adapter](docs/CODEX_ADAPTER.md) · [demo capture guide](docs/DEMO.md).
+More detail: [architecture](docs/ARCHITECTURE.md) · [ACP adapter](docs/ACP_ADAPTER.md) · [Codex adapter](docs/CODEX_ADAPTER.md) · [OpenCode adapter](docs/OPENCODE_ADAPTER.md) · [demo capture guide](docs/DEMO.md).
 
 ## Quality checks
 
@@ -127,7 +128,7 @@ The server regression suite covers adapter contracts, capability combinations, l
 
 ## Adapter availability
 
-The v0.3 release ships the migrated Claude Code adapter and the agent-neutral extension boundary. The in-development v0.4 line now includes tested local ACP v1 and native Codex app-server adapters; inspect their readiness and effective capabilities in **Your agents**. OpenCode and a conservative generic-command adapter remain tracked deliverables in [ROADMAP.md](ROADMAP.md) and are not presented as working until their own fixtures and live matrix pass.
+The v0.3 release ships the migrated Claude Code adapter and the agent-neutral extension boundary. The in-development v0.4 line now includes tested local ACP v1, native Codex app-server, and ACP-first OpenCode adapters; inspect their readiness, discovered models, transport, and effective capabilities in **Your agents**. A conservative generic-command adapter remains tracked in [ROADMAP.md](ROADMAP.md) and is not presented as working until its own fixtures and live matrix pass.
 
 ## Contributing and release notes
 

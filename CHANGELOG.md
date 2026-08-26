@@ -4,6 +4,8 @@ All notable changes are documented here. This project follows semantic versionin
 
 ## Unreleased
 
+- Add an ACP-first OpenCode 1.18 adapter with version/transport detection, CLI-owned model discovery, native resume, explicit model configuration, and no automatic session sharing.
+- Add a clearly reduced OpenCode JSON-run fallback with bounded parsing, tool/usage mapping, process-group cancellation, and no interactive approvals, plans, questions, auto-approval, or sharing.
 - Add a native Codex app-server v2 adapter with free readiness/auth probes, thread start/resume, model discovery, streamed items, approvals, questions, plan/usage mapping, native safety profiles, interruption, and process cleanup.
 - Require explicit confirmation before combining Codex `never` approvals with `danger-full-access`, while showing native and SwiftAgent safety as separate layers.
 - Add a local ACP v1 client adapter based on the official SDK, with negotiated capabilities, native session creation/loading, permissions, streamed updates, cancellation, and bounded native diagnostics.

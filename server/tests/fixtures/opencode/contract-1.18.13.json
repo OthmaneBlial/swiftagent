@@ -1,0 +1,22 @@
+{
+  "agent": "OpenCode",
+  "version": "1.18.13",
+  "official_docs": {
+    "acp": "https://opencode.ai/docs/acp/",
+    "cli": "https://opencode.ai/docs/cli/",
+    "models": "https://opencode.ai/docs/models/"
+  },
+  "preferred_transport": "opencode acp over ACP v1 JSON-RPC stdio",
+  "fallback_transport": "opencode run --format json",
+  "live_probe": {
+    "protocol_version": 1,
+    "load_session": true,
+    "resume": true,
+    "fork": true,
+    "image": true,
+    "embedded_context": true,
+    "model_config_option": true,
+    "session_sharing_enabled": false,
+    "model_prompt_sent": false
+  }
+}

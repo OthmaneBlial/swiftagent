@@ -389,6 +389,8 @@ runs with Claude Code, Codex, and OpenCode through the same interface.
 
 ### 1.3 Add the OpenCode adapter
 
+**Status: completed, validated, and pushed.**
+
 - Prefer `opencode acp` so SwiftAgent exercises its standard client path.
 - Version-gate the integration and verify advertised capabilities.
 - Provide a reduced native JSON-run fallback only when ACP is unavailable;

@@ -59,6 +59,8 @@ export interface AppSettings {
     codex_approval_policy: 'untrusted' | 'on-request' | 'never';
     codex_sandbox_mode: 'read-only' | 'workspace-write' | 'danger-full-access';
     codex_allow_dangerous_bypass: boolean;
+    opencode_model: string | null;
+    opencode_cli_path: string | null;
     workspace_dir: string;
     sandbox_mode: 'strict' | 'fallback';
 }
@@ -98,6 +100,11 @@ export interface AgentStatus {
     detail: string | null;
     checked_at: string;
     capabilities: AgentCapabilities;
+    models: Array<{
+        id: string;
+        name: string;
+        provider: string | null;
+    }>;
 }
 
 export interface AgentListResponse {

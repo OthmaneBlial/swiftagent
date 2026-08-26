@@ -109,6 +109,18 @@ def _get_codex_status(definition: AgentDefinition) -> AgentStatus:
     return get_status(definition)
 
 
+def _create_opencode_adapter(task: Task, manager: Any) -> AgentAdapter:
+    from swiftagent.agents.opencode import OpenCodeAdapter
+
+    return OpenCodeAdapter(task, manager)
+
+
+def _get_opencode_status(definition: AgentDefinition) -> AgentStatus:
+    from swiftagent.agents.opencode.status import get_status
+
+    return get_status(definition)
+
+
 agent_registry = AgentRegistry()
 agent_registry.register(
     AgentDefinition(
@@ -184,4 +196,33 @@ agent_registry.register(
     ),
     _create_codex_adapter,
     _get_codex_status,
+)
+agent_registry.register(
+    AgentDefinition(
+        agent_id="opencode",
+        display_name="OpenCode",
+        adapter_id="opencode-acp-v1",
+        adapter_version="0.4.0",
+        protocol="acp-v1",
+        install_url="https://opencode.ai/docs/",
+        documentation_url="https://opencode.ai/docs/acp/",
+        capabilities=AgentCapabilities(
+            structured_streaming=True,
+            session_resume=True,
+            session_fork=True,
+            tool_events=True,
+            approvals=True,
+            questions=False,
+            plan_updates=True,
+            attachments=True,
+            attachment_types=["image/*", "application/octet-stream"],
+            model_discovery=True,
+            mode_discovery=True,
+            usage=True,
+            native_sandbox=False,
+            external_sandbox="partial",
+        ),
+    ),
+    _create_opencode_adapter,
+    _get_opencode_status,
 )

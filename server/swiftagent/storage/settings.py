@@ -164,6 +164,11 @@ def get_app_settings() -> AppSettings:
         codex_allow_dangerous_bypass=(
             _get("codex_allow_dangerous_bypass", "0") == "1"
         ),
+        opencode_model=_get("opencode_model", "").strip() or None,
+        opencode_cli_path=_get(
+            "opencode_cli_path", os.environ.get("SWIFTAGENT_OPENCODE_PATH", "")
+        ).strip()
+        or None,
         workspace_dir=get_workspace_dir(),
         sandbox_mode=get_sandbox_mode(),
     )

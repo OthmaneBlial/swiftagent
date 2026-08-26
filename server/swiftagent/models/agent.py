@@ -43,6 +43,14 @@ class AgentDefinition(BaseModel):
     capabilities: AgentCapabilities
 
 
+class AgentModelOption(BaseModel):
+    """One adapter-discovered provider/model identifier safe to show in the UI."""
+
+    id: str = Field(min_length=1, max_length=256)
+    name: str = Field(min_length=1, max_length=256)
+    provider: str | None = Field(default=None, max_length=128)
+
+
 class AgentStatus(BaseModel):
     """Read-only discovery result for an installed coding agent."""
 
@@ -63,6 +71,7 @@ class AgentStatus(BaseModel):
     detail: str | None = Field(default=None, max_length=1_024)
     checked_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     capabilities: AgentCapabilities
+    models: list[AgentModelOption] = Field(default_factory=list, max_length=256)
 
 
 class AgentEventType(StrEnum):

@@ -167,6 +167,7 @@ class AcpAdapter:
             )
             self._session_id = session_state.session_id
 
+        await self._apply_session_config(session_state)
         if getattr(session_state, "modes", None):
             self.task.capability_snapshot["mode_discovery"] = True
         self.task.native_session_id = self._session_id
@@ -263,6 +264,63 @@ class AcpAdapter:
                 "cancellation": True,
             }
         )
+
+    async def _apply_session_config(self, session_state: Any) -> None:
+        """Discover adapter-owned options and apply a validated per-task model."""
+        if self._connection is None or self._session_id is None:
+            return
+        raw_state = self.model_metadata(session_state)
+        config_options = raw_state.get("configOptions") or []
+        if not isinstance(config_options, list):
+            return
+
+        model_option = next(
+            (
+                option
+                for option in config_options
+                if isinstance(option, dict)
+                and (option.get("category") == "model" or option.get("id") == "model")
+            ),
+            None,
+        )
+        self.task.capability_snapshot["mode_discovery"] = any(
+            isinstance(option, dict) and option.get("category") == "mode"
+            for option in config_options
+        )
+        if model_option is None:
+            return
+
+        choices = model_option.get("options") or []
+        available_models = [
+            str(choice.get("value"))
+            for choice in choices
+            if isinstance(choice, dict) and isinstance(choice.get("value"), str)
+        ][:256]
+        self.task.capability_snapshot["model_discovery"] = bool(available_models)
+        self.task.capability_snapshot["available_models"] = available_models
+        current_model = model_option.get("currentValue")
+        if isinstance(current_model, str):
+            self.task.capability_snapshot["effective_model"] = current_model
+
+        requested_model = self.task.config.model_id
+        if not requested_model:
+            return
+        if requested_model not in available_models:
+            raise RuntimeError(
+                f"The requested model is not advertised by this ACP agent: {requested_model}"
+            )
+        config_id = model_option.get("id")
+        if not isinstance(config_id, str) or not config_id:
+            raise RuntimeError("The ACP agent advertised models without a configurable option ID")
+        await asyncio.wait_for(
+            self._connection.set_config_option(
+                config_id=config_id,
+                session_id=self._session_id,
+                value=requested_model,
+            ),
+            timeout=15,
+        )
+        self.task.capability_snapshot["effective_model"] = requested_model
 
     async def _run_prompt(self) -> None:
         assert self._connection is not None and self._session_id is not None

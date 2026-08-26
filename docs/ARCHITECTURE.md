@@ -18,7 +18,7 @@ SwiftAgent intentionally has one local process boundary rather than a distribute
 
 Adapters emit a small normalized vocabulary (`run.started`, messages, tools, approvals, questions, plans, usage, and terminal events) while retaining bounded native metadata for diagnosis. Legacy browser events remain temporarily available during the v0.x UI migration.
 
-Concrete adapters live under `swiftagent/agents/`. Claude Code preserves its native stream-JSON behavior, the ACP v1 client uses the official SDK to negotiate compatible local agents, and Codex uses the official bidirectional app-server v2 JSONL interface. OpenCode and generic-command integrations plug into the same boundary; they do not add agent-specific branches to the task manager.
+Concrete adapters live under `swiftagent/agents/`. Claude Code preserves its native stream-JSON behavior, the ACP v1 client uses the official SDK to negotiate compatible local agents, and Codex uses the official bidirectional app-server v2 JSONL interface. OpenCode prefers that same ACP client and selects its explicitly reduced native JSON-run adapter only when ACP is absent. The generic-command integration plugs into the same boundary; no integration adds agent-specific branches to the task manager.
 
 ## Storage and boundaries
 

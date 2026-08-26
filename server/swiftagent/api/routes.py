@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field
 
 from swiftagent.agents.acp import settings as acp_settings
 from swiftagent.agents.codex import settings as codex_settings
+from swiftagent.agents.opencode import settings as opencode_settings
 from swiftagent.agents.registry import agent_registry
 from swiftagent.models.settings import AppSettings
 from swiftagent.models.task import Task
@@ -90,6 +91,8 @@ class SettingsUpdate(BaseModel):
         Literal["read-only", "workspace-write", "danger-full-access"] | None
     ) = None
     codex_allow_dangerous_bypass: bool | None = None
+    opencode_model: str | None = Field(default=None, max_length=256)
+    opencode_cli_path: str | None = Field(default=None, max_length=4_096)
     workspace_dir: str | None = Field(default=None, max_length=4_096)
     sandbox_mode: Literal["strict", "fallback"] | None = None
 
@@ -151,6 +154,10 @@ async def update_settings(update: SettingsUpdate):
         codex_settings.set_sandbox_mode(update.codex_sandbox_mode)
     if update.codex_allow_dangerous_bypass is not None:
         codex_settings.set_allow_dangerous_bypass(update.codex_allow_dangerous_bypass)
+    if update.opencode_model is not None:
+        opencode_settings.set_model(update.opencode_model or None)
+    if update.opencode_cli_path is not None:
+        opencode_settings.set_cli_path(update.opencode_cli_path or None)
     if update.workspace_dir is not None:
         raw_workspace = update.workspace_dir.strip()
         if not raw_workspace:

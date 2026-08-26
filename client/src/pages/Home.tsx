@@ -14,6 +14,20 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { api, type AgentStatus, type AppSettings, ws } from '../lib/swiftagent';
 import { toast } from '../lib/toast';
 
+const isAgentReady = (agent: AgentStatus) => (
+    agent.installed &&
+    agent.compatible !== false &&
+    agent.auth_status !== 'action_required' &&
+    agent.auth_status !== 'error'
+);
+
+const configuredModelFor = (agentId: string, settings: AppSettings) => {
+    if (agentId === 'opencode') return settings.opencode_model ?? '';
+    if (agentId === 'codex') return settings.codex_model ?? '';
+    if (agentId === 'claude-code') return settings.claude_model ?? '';
+    return '';
+};
+
 export default function Home() {
     const [prompt, setPrompt] = useState('');
     const [loading, setLoading] = useState(false);
@@ -32,7 +46,7 @@ export default function Home() {
         () => agents.find((agent) => agent.agent_id === agentId) ?? null,
         [agentId, agents],
     );
-    const agentReady = Boolean(selectedAgent?.installed && selectedAgent.compatible !== false);
+    const agentReady = Boolean(selectedAgent && isAgentReady(selectedAgent));
 
     useEffect(() => {
         textareaRef.current?.focus();
@@ -45,13 +59,14 @@ export default function Home() {
                 const preferred = catalog.agents.find(
                     (agent) =>
                         agent.agent_id === currentSettings.default_agent_id &&
-                        agent.installed &&
-                        agent.compatible !== false,
+                        isAgentReady(agent),
                 );
                 const firstReady = catalog.agents.find(
-                    (agent) => agent.installed && agent.compatible !== false,
+                    isAgentReady,
                 );
-                setAgentId((preferred ?? firstReady ?? catalog.agents[0])?.agent_id ?? '');
+                const initialAgentId = (preferred ?? firstReady ?? catalog.agents[0])?.agent_id ?? '';
+                setAgentId(initialAgentId);
+                setModelId(configuredModelFor(initialAgentId, currentSettings));
             })
             .catch((error: Error) => toast.error('Could not load agents', error.message))
             .finally(() => {
@@ -144,13 +159,17 @@ export default function Home() {
                             <span className="sr-only">Coding agent</span>
                             <select
                                 value={agentId}
-                                onChange={(event) => setAgentId(event.target.value)}
+                                onChange={(event) => {
+                                    const nextAgentId = event.target.value;
+                                    setAgentId(nextAgentId);
+                                    setModelId(settings ? configuredModelFor(nextAgentId, settings) : '');
+                                }}
                                 disabled={loadingAgents || agents.length === 0}
                                 className="h-10 w-full appearance-none rounded-xl border border-border bg-background pl-3 pr-9 text-sm font-medium text-foreground outline-none transition focus:border-primary/50 focus:ring-2 focus:ring-primary/10 disabled:opacity-50"
                             >
                                 {agents.map((agent) => (
                                     <option key={agent.agent_id} value={agent.agent_id}>
-                                        {agent.display_name} · {!agent.installed ? 'missing' : agent.compatible === false ? 'attention required' : 'ready'}
+                                        {agent.display_name} · {!agent.installed ? 'missing' : !isAgentReady(agent) ? 'attention required' : 'ready'}
                                     </option>
                                 ))}
                             </select>
@@ -229,12 +248,25 @@ export default function Home() {
                                     {selectedAgent?.capabilities.model_discovery ? (
                                         <label className="space-y-1.5">
                                             <span className="text-xs font-medium text-foreground">Model</span>
-                                            <input
-                                                value={modelId}
-                                                onChange={(event) => setModelId(event.target.value)}
-                                                placeholder="Agent default"
-                                                className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/10"
-                                            />
+                                            {selectedAgent.models.length ? (
+                                                <select
+                                                    value={modelId}
+                                                    onChange={(event) => setModelId(event.target.value)}
+                                                    className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/10"
+                                                >
+                                                    <option value="">Agent default</option>
+                                                    {selectedAgent.models.map((model) => (
+                                                        <option key={model.id} value={model.id}>{model.name}</option>
+                                                    ))}
+                                                </select>
+                                            ) : (
+                                                <input
+                                                    value={modelId}
+                                                    onChange={(event) => setModelId(event.target.value)}
+                                                    placeholder="Agent default"
+                                                    className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/10"
+                                                />
+                                            )}
                                         </label>
                                     ) : null}
                                 </div>

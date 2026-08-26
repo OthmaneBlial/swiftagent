@@ -1,4 +1,4 @@
-.PHONY: dev dev-server dev-client install install-server install-client setup start build lint lint-server lint-client test test-server test-client clean onboard onboard-show demo-verify demo-prepare
+.PHONY: dev dev-server dev-client install install-server install-client setup start build lint lint-server lint-client test test-server test-client clean onboard onboard-show demo-verify demo-prepare adapter-kit-test
 
 PYTHON := server/.venv/bin/python
 
@@ -36,6 +36,9 @@ demo-verify: ## Verify the deterministic demo fixture without calling an agent
 
 demo-prepare: ## Reset demo workspaces for Claude Code, Codex, and OpenCode
 	$(PYTHON) scripts/demo_workspace.py prepare-all
+
+adapter-kit-test: ## Validate the public example adapter and write no persistent state
+	PYTHONPATH=server $(PYTHON) -m swiftagent.adapter_sdk.contract --manifest adapter-kit/example-adapter/example-acp.adapter.json
 
 # ─── Production ─────────────────────────────────────────
 start: ## Start in production mode

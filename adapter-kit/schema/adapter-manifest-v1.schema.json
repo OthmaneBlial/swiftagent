@@ -1,0 +1,156 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/OthmaneBlial/swiftagent/blob/main/adapter-kit/schema/adapter-manifest-v1.schema.json",
+  "title": "SwiftAgent local ACP adapter manifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "adapter_api_version",
+    "agent_id",
+    "display_name",
+    "adapter_id",
+    "adapter_version",
+    "protocol",
+    "command",
+    "capabilities"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "adapter_api_version": { "const": "1.0" },
+    "agent_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,63}$" },
+    "display_name": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "adapter_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,63}$" },
+    "adapter_version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+(?:[-+][0-9A-Za-z.-]+)?$" },
+    "protocol": { "const": "acp-v1" },
+    "command": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "items": { "type": "string", "minLength": 1, "maxLength": 4096 }
+    },
+    "environment_allowlist": {
+      "type": "array",
+      "maxItems": 64,
+      "uniqueItems": true,
+      "items": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,127}$" }
+    },
+    "state_directories": {
+      "type": "array",
+      "maxItems": 16,
+      "items": { "type": "string", "minLength": 1, "maxLength": 4096 }
+    },
+    "capabilities": { "$ref": "#/$defs/capabilities" },
+    "version_probe": { "$ref": "#/$defs/versionProbe" },
+    "compatibility": { "$ref": "#/$defs/compatibility" },
+    "contract": { "$ref": "#/$defs/contract" },
+    "documentation_url": { "type": "string", "maxLength": 2048 },
+    "install_url": { "type": "string", "maxLength": 2048 }
+  },
+  "$defs": {
+    "capabilities": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "structured_streaming": { "type": "boolean", "default": false },
+        "session_create": { "type": "boolean", "default": true },
+        "session_resume": { "type": "boolean", "default": false },
+        "session_fork": { "type": "boolean", "default": false },
+        "tool_events": { "type": "boolean", "default": false },
+        "approvals": { "type": "boolean", "default": false },
+        "questions": { "type": "boolean", "default": false },
+        "plan_updates": { "type": "boolean", "default": false },
+        "attachments": { "type": "boolean", "default": false },
+        "attachment_types": { "type": "array", "items": { "type": "string" } },
+        "model_discovery": { "type": "boolean", "default": false },
+        "mode_discovery": { "type": "boolean", "default": false },
+        "usage": { "type": "boolean", "default": false },
+        "native_sandbox": { "type": "boolean", "default": false },
+        "external_sandbox": {
+          "type": "string",
+          "enum": ["partial", "unsupported", "unknown"],
+          "default": "unknown"
+        },
+        "cancellation": { "type": "boolean", "default": true }
+      }
+    },
+    "versionProbe": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["regex"],
+      "properties": {
+        "arguments": {
+          "type": "array",
+          "maxItems": 16,
+          "items": { "type": "string", "minLength": 1, "maxLength": 4096 }
+        },
+        "regex": { "type": "string", "minLength": 1, "maxLength": 512 },
+        "timeout_seconds": { "type": "integer", "minimum": 1, "maximum": 15, "default": 5 }
+      }
+    },
+    "compatibility": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract_result",
+        "tested_agent_versions",
+        "operating_systems",
+        "evidence",
+        "tested_at"
+      ],
+      "properties": {
+        "contract_suite": { "const": "swiftagent-adapter-contract-v1" },
+        "contract_result": { "const": "passed" },
+        "tested_agent_versions": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 32,
+          "items": { "type": "string", "minLength": 1, "maxLength": 512 }
+        },
+        "operating_systems": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 16,
+          "items": { "type": "string", "minLength": 1, "maxLength": 512 }
+        },
+        "evidence": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 16,
+          "items": { "type": "string", "minLength": 1, "maxLength": 512 }
+        },
+        "tested_at": { "type": "string", "format": "date" }
+      }
+    },
+    "contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "prompt": { "type": "string", "maxLength": 4096 },
+        "fixture_files": {
+          "type": "object",
+          "maxProperties": 16,
+          "additionalProperties": { "type": "string", "maxLength": 65536 }
+        },
+        "expected_event_types": {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "type": "string",
+            "enum": [
+              "run.started", "message.delta", "message.completed", "tool.started",
+              "tool.updated", "tool.completed", "approval.requested",
+              "approval.resolved", "question.requested", "question.resolved",
+              "plan.updated", "usage.updated", "run.completed", "run.failed"
+            ]
+          }
+        },
+        "cancellation_arguments": {
+          "type": "array",
+          "maxItems": 16,
+          "items": { "type": "string", "minLength": 1, "maxLength": 4096 }
+        }
+      }
+    }
+  }
+}

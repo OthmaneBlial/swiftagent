@@ -139,6 +139,8 @@ def test_agents_endpoint_and_default_agent_setting(client, monkeypatch):
     response = client.get("/api/agents?refresh=true")
 
     assert response.status_code == 200
+    assert response.json()["adapter_api_version"] == "1.0"
+    assert response.json()["load_errors"] == []
     assert response.json()["agents"][0]["agent_id"] == "fixture-agent"
     assert response.json()["agents"][0]["capabilities"]["tool_events"] is True
 

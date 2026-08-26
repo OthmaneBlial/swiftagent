@@ -68,6 +68,7 @@ Use [`.env.example`](.env.example) as the reference. Environment settings establ
 | `SWIFTAGENT_WORKSPACE_DIR` | `~/.swiftagent/workspace` | Dedicated root for Files and task working directories. |
 | `SWIFTAGENT_SANDBOX_MODE` | `strict` | `strict` requires working bwrap; `fallback` is explicit and unisolated. |
 | `SWIFTAGENT_ACP_COMMAND_JSON` | empty | Literal argv array for a local ACP v1 agent, for example `["your-agent", "acp"]`. |
+| `SWIFTAGENT_ADAPTER_DIR` | `$SWIFTAGENT_DATA_DIR/adapters` | Direct local `*.adapter.json` manifests for Adapter API 1.0; never downloaded automatically. |
 | `SWIFTAGENT_OPENCODE_PATH` | auto-detect | Optional OpenCode CLI path; provider login remains owned by OpenCode. |
 | `SWIFTAGENT_TASK_TIMEOUT_SEC` | `900` | Per-task timeout in seconds. |
 | `SWIFTAGENT_MAX_FILE_BYTES` | `1048576` | Maximum UTF-8 file read/write size. |
@@ -141,7 +142,7 @@ FastAPI ── Task manager ── Agent registry ── selected local adapter
    └── SQLite history/settings and workspace-scoped file API
 ```
 
-More detail: [architecture](docs/ARCHITECTURE.md) · [compatibility matrix](docs/COMPATIBILITY.md) · [Local Run Receipts](docs/RUN_RECEIPTS.md) · [cross-agent handoffs](docs/HANDOFFS.md) · [ACP adapter](docs/ACP_ADAPTER.md) · [Codex adapter](docs/CODEX_ADAPTER.md) · [OpenCode adapter](docs/OPENCODE_ADAPTER.md) · [generic command adapter](docs/GENERIC_COMMAND_ADAPTER.md) · [reproducible demo](docs/DEMO.md).
+More detail: [architecture](docs/ARCHITECTURE.md) · [compatibility matrix](docs/COMPATIBILITY.md) · [adapter developer kit](docs/ADAPTER_SDK.md) · [Local Run Receipts](docs/RUN_RECEIPTS.md) · [cross-agent handoffs](docs/HANDOFFS.md) · [ACP adapter](docs/ACP_ADAPTER.md) · [Codex adapter](docs/CODEX_ADAPTER.md) · [OpenCode adapter](docs/OPENCODE_ADAPTER.md) · [generic command adapter](docs/GENERIC_COMMAND_ADAPTER.md) · [reproducible demo](docs/DEMO.md).
 
 ## Quality checks
 

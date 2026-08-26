@@ -244,6 +244,8 @@ export interface AgentStatus {
 }
 
 export interface AgentListResponse {
+    adapter_api_version: string;
+    load_errors: string[];
     default_agent_id: string;
     agents: AgentStatus[];
 }

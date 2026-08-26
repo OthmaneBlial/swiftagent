@@ -16,6 +16,8 @@ const PERMISSION_MODES = ['default', 'acceptEdits', 'dontAsk', 'bypassPermission
 export default function Settings() {
     const [settings, setSettings] = useState<AppSettings | null>(null);
     const [agents, setAgents] = useState<AgentStatus[]>([]);
+    const [adapterApiVersion, setAdapterApiVersion] = useState('');
+    const [adapterLoadErrors, setAdapterLoadErrors] = useState<string[]>([]);
     const [engineStatus, setEngineStatus] = useState<EngineStatus | null>(null);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -29,6 +31,8 @@ export default function Settings() {
                 if (cancelled) return;
                 setSettings(currentSettings);
                 setAgents(catalog.agents);
+                setAdapterApiVersion(catalog.adapter_api_version);
+                setAdapterLoadErrors(catalog.load_errors);
                 setEngineStatus(status);
             })
             .catch((error: Error) => toast.error('Failed to load settings', error.message))
@@ -54,6 +58,8 @@ export default function Settings() {
             setSettings(updated);
             const catalog = await api.listAgents(true);
             setAgents(catalog.agents);
+            setAdapterApiVersion(catalog.adapter_api_version);
+            setAdapterLoadErrors(catalog.load_errors);
             applyTheme(updated.theme);
             toast.success('Settings saved', `${updated.default_agent_id} is your default agent.`);
         } catch (error) {
@@ -68,6 +74,8 @@ export default function Settings() {
         try {
             const [catalog, status] = await Promise.all([api.listAgents(true), api.getEngineStatus(false)]);
             setAgents(catalog.agents);
+            setAdapterApiVersion(catalog.adapter_api_version);
+            setAdapterLoadErrors(catalog.load_errors);
             setEngineStatus(status);
             toast.success('Agent detection refreshed');
         } catch (error) {
@@ -88,6 +96,8 @@ export default function Settings() {
             const result = await api.testGenericCommand();
             const catalog = await api.listAgents(true);
             setAgents(catalog.agents);
+            setAdapterApiVersion(catalog.adapter_api_version);
+            setAdapterLoadErrors(catalog.load_errors);
             toast.success(
                 'Disposable adapter test passed',
                 result.version_output || 'Prompt transport and exact marker verified.',
@@ -140,8 +150,18 @@ export default function Settings() {
                 <section aria-labelledby="agent-list-title" className="space-y-3">
                     <div className="flex items-center justify-between">
                         <h2 id="agent-list-title" className="text-sm font-semibold text-foreground">Detected integrations</h2>
-                        <span className="text-xs text-muted-foreground">{agents.length} adapter{agents.length === 1 ? '' : 's'}</span>
+                        <span className="text-xs text-muted-foreground">
+                            {agents.length} adapter{agents.length === 1 ? '' : 's'} · API {adapterApiVersion || 'unknown'}
+                        </span>
                     </div>
+                    {adapterLoadErrors.length ? (
+                        <div role="alert" className="rounded-xl border border-amber-500/35 bg-amber-500/10 p-3 text-xs leading-relaxed text-amber-800 dark:text-amber-200">
+                            <p className="font-semibold">Some local adapter manifests were skipped.</p>
+                            <ul className="mt-1 list-disc space-y-1 pl-4">
+                                {adapterLoadErrors.map((error) => <li key={error}>{error}</li>)}
+                            </ul>
+                        </div>
+                    ) : null}
                     <div className="grid gap-3">
                         {agents.map((agent) => (
                             <AgentCard

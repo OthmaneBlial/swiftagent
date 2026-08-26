@@ -513,6 +513,8 @@ without editing the application core.
 
 ### 3.1 Publish the adapter developer kit
 
+**Status: completed, validated, and pushed.**
+
 - Version the adapter API independently from the app release.
 - Provide a minimal fake agent, contract-test harness, event fixtures, manifest
   schema, security checklist, and example adapter.

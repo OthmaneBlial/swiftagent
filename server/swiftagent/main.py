@@ -66,6 +66,12 @@ async def lifespan(app: FastAPI):
     # 2. Initialize database
     db_path = data_dir / "swiftagent.db"
     init_database(str(db_path))
+    from swiftagent.adapter_sdk.loader import load_external_adapters
+    from swiftagent.agents.registry import agent_registry
+
+    adapter_errors = load_external_adapters(agent_registry, data_dir)
+    for error in adapter_errors:
+        logger.warning("external_adapter_load_failed error=%s", error)
     from swiftagent.storage import tasks as task_repo
 
     recovered = task_repo.recover_interrupted_tasks()

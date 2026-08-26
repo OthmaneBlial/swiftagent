@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "adapter_api_version": "1.0",
+  "agent_id": "example-acp-agent",
+  "display_name": "Example ACP Agent",
+  "adapter_id": "example-acp-v1",
+  "adapter_version": "1.0.0",
+  "protocol": "acp-v1",
+  "command": ["${python}", "${manifest_dir}/fake_agent.py"],
+  "environment_allowlist": [],
+  "state_directories": [],
+  "capabilities": {
+    "structured_streaming": true,
+    "session_create": true,
+    "session_resume": true,
+    "session_fork": false,
+    "tool_events": true,
+    "approvals": true,
+    "questions": false,
+    "plan_updates": true,
+    "attachments": false,
+    "attachment_types": [],
+    "model_discovery": false,
+    "mode_discovery": false,
+    "usage": true,
+    "native_sandbox": false,
+    "external_sandbox": "partial",
+    "cancellation": true
+  },
+  "version_probe": {
+    "arguments": ["--version"],
+    "regex": "example-acp-agent (\\d+\\.\\d+\\.\\d+)",
+    "timeout_seconds": 5
+  },
+  "compatibility": {
+    "contract_suite": "swiftagent-adapter-contract-v1",
+    "contract_result": "passed",
+    "tested_agent_versions": ["example-acp-agent 1.0.0"],
+    "operating_systems": ["macOS arm64 deterministic fixture", "Linux CI"],
+    "evidence": ["contract-report.json"],
+    "tested_at": "2026-08-27"
+  },
+  "contract": {
+    "prompt": "Exercise the example ACP adapter contract without network access.",
+    "fixture_files": {
+      "fixture-input.txt": "safe adapter contract input\n"
+    },
+    "expected_event_types": [
+      "run.started",
+      "tool.started",
+      "approval.requested",
+      "approval.resolved",
+      "tool.completed",
+      "plan.updated",
+      "usage.updated",
+      "message.completed",
+      "run.completed"
+    ],
+    "cancellation_arguments": ["--scenario", "cancel"]
+  },
+  "documentation_url": "https://github.com/OthmaneBlial/swiftagent/tree/main/adapter-kit/example-adapter"
+}

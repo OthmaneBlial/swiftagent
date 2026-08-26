@@ -50,10 +50,12 @@ class AcpAdapter:
         manager: ConnectionManager,
         *,
         command: list[str] | None = None,
+        environment: dict[str, str] | None = None,
     ):
         self.task = task
         self.manager = manager
         self._command = command
+        self._environment = environment
         self._process: asyncio.subprocess.Process | None = None
         self._connection: ClientSideConnection | None = None
         self._bridge: AcpClientBridge | None = None
@@ -109,7 +111,7 @@ class AcpAdapter:
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
             cwd=str(self._workspace),
-            env=os.environ.copy(),
+            env=self._environment if self._environment is not None else os.environ.copy(),
             start_new_session=True,
             limit=MAX_ACP_FRAME_BYTES,
         )

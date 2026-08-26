@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "contract_suite": "swiftagent-adapter-contract-v1",
+  "required_core_events": [
+    "run.started",
+    "message.delta",
+    "message.completed",
+    "run.completed"
+  ],
+  "capability_evidence": {
+    "tool_events": ["tool.started", "tool.completed"],
+    "approvals": ["approval.requested", "approval.resolved"],
+    "plan_updates": ["plan.updated"],
+    "usage": ["usage.updated"]
+  },
+  "terminal_states": ["completed", "failed", "cancelled"]
+}

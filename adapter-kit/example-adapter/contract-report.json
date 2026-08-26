@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "contract_suite": "swiftagent-adapter-contract-v1",
+  "adapter_api_version": "1.0",
+  "manifest": {
+    "agent_id": "example-acp-agent",
+    "adapter_id": "example-acp-v1",
+    "adapter_version": "1.0.0",
+    "protocol": "acp-v1"
+  },
+  "result": "passed",
+  "event_types": [
+    "run.started",
+    "tool.started",
+    "approval.requested",
+    "approval.resolved",
+    "tool.completed",
+    "plan.updated",
+    "usage.updated",
+    "message.delta",
+    "message.completed",
+    "run.completed"
+  ],
+  "required_event_types": [
+    "approval.requested",
+    "approval.resolved",
+    "message.completed",
+    "message.delta",
+    "plan.updated",
+    "run.completed",
+    "run.started",
+    "tool.completed",
+    "tool.started",
+    "usage.updated"
+  ],
+  "resume_checked": true,
+  "cancellation_checked": true,
+  "cancellation_event_types": [
+    "run.started",
+    "run.completed"
+  ],
+  "security": {
+    "shell_used": false,
+    "temporary_workspace": true,
+    "network_required": false,
+    "environment_allowlist": []
+  },
+  "generated_at": "2026-08-26T22:39:28.666277+00:00"
+}

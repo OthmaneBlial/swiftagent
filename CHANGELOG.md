@@ -4,6 +4,8 @@ All notable changes are documented here. This project follows semantic versionin
 
 ## Unreleased
 
+- Publish Adapter API 1.0 with a strict local manifest loader, deterministic ACP fake agent, executable contract suite, event fixtures, JSON schema, security checklist, compatibility report, and contributor documentation.
+- Surface adapter API identity and skipped local-manifest errors in Settings while keeping external commands out of process, environment-allowlisted, collision-safe, and never auto-downloaded.
 - Add durable Local Run Receipts with normalized/native event evidence, separate safety layers, Git impact, explicit verification status, and JSON/Markdown export.
 - Add expiring single-use cross-agent handoff previews with user-selected context, visible redaction reports, source/target links, and no native session transfer.
 - Add the dependency-free Northstar three-agent demo fixture, isolated Git workspace preparation, deterministic verification, a real protocol-fixture screenshot/GIF, and an agent-neutral project site.

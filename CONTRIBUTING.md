@@ -23,6 +23,11 @@ For the public multi-agent workflow fixture, run `make demo-verify`. It must sta
 dependency-free, contain no credentials, and preserve the same acceptance task
 for Claude Code, Codex, and OpenCode.
 
+For a new out-of-process ACP integration, start with the
+[Adapter Kit](adapter-kit/README.md). A proposal must include its validated
+manifest, contract report, exact compatibility scope, and completed security
+checklist. A manifest never grants itself built-in or community verification.
+
 `strict` must fail closed when bwrap is unavailable. Do not reintroduce automatic unsandboxed fallback or widen workspace paths without a security review.
 
 ## Pull requests

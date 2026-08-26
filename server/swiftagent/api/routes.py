@@ -286,7 +286,12 @@ async def update_settings(update: SettingsUpdate):
 @router.get("/agents")
 async def list_agents(refresh: bool = Query(default=False)):
     """Return read-only local readiness and declared capabilities."""
+    from swiftagent.adapter_sdk import ADAPTER_API_VERSION
+    from swiftagent.adapter_sdk.loader import load_errors
+
     return {
+        "adapter_api_version": ADAPTER_API_VERSION,
+        "load_errors": load_errors(),
         "default_agent_id": settings_repo.get_default_agent_id(),
         "agents": agent_registry.statuses(refresh=refresh),
     }

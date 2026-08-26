@@ -20,6 +20,12 @@ Adapters emit a small normalized vocabulary (`run.started`, messages, tools, app
 
 Concrete adapters live under `swiftagent/agents/`. Claude Code preserves its native stream-JSON behavior, the ACP v1 client uses the official SDK to negotiate compatible local agents, and Codex uses the official bidirectional app-server v2 JSONL interface. OpenCode prefers that same ACP client and selects its explicitly reduced native JSON-run adapter only when ACP is absent. The generic-command integration is text-only, literal-argv, allowlisted, bounded, and gated by a disposable-test receipt. No integration adds agent-specific branches to the task manager.
 
+External integrations use Adapter API `1.0`: a bounded local JSON manifest
+registers an out-of-process ACP command through the same registry without
+importing third-party code into FastAPI. The loader scans only the local adapter
+directory at startup, rejects ID collisions and incompatible schemas, forwards
+an explicit environment allowlist, and never downloads or updates commands.
+
 ## Storage and boundaries
 
 - SQLite database: `~/.swiftagent/swiftagent.db` by default, configurable with `SWIFTAGENT_DATA_DIR`.

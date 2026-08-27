@@ -84,6 +84,12 @@ class ExampleAgent:
         if self.scenario == "cancel":
             await self.cancelled.wait()
             return PromptResponse(stopReason="cancelled")
+        if self.scenario == "fail":
+            await self.client.session_update(
+                session_id,
+                update_agent_message_text("Example ACP adapter contract refused deterministically."),
+            )
+            return PromptResponse(stopReason="refusal")
 
         await self.client.session_update(
             session_id,
@@ -161,7 +167,7 @@ class ExampleAgent:
 async def run() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--version", action="version", version="example-acp-agent 1.0.0")
-    parser.add_argument("--scenario", choices=("basic", "cancel"), default="basic")
+    parser.add_argument("--scenario", choices=("basic", "cancel", "fail"), default="basic")
     arguments = parser.parse_args()
     await run_agent(ExampleAgent(arguments.scenario))
 

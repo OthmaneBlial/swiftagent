@@ -39,11 +39,19 @@
     "run.started",
     "run.completed"
   ],
+  "failure_checked": true,
+  "failure_event_types": [
+    "run.started",
+    "message.delta",
+    "message.completed",
+    "run.failed"
+  ],
+  "failure_recovery_checked": true,
   "security": {
     "shell_used": false,
     "temporary_workspace": true,
     "network_required": false,
     "environment_allowlist": []
   },
-  "generated_at": "2026-08-26T22:39:28.666277+00:00"
+  "generated_at": "2026-08-27T00:50:16.566949+00:00"
 }

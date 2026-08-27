@@ -134,6 +134,34 @@ async def _cancelled_run(
     return [event.type.value for event in manager.agent_events]
 
 
+async def _failed_run(
+    manifest: AdapterManifest,
+    workspace: Path,
+    command: list[str],
+) -> list[str]:
+    """Drive a deterministic agent failure and require normalized failure evidence."""
+    task = _task(manifest, workspace, "Exercise a deterministic adapter failure without network access.")
+    manager = ContractManager()
+    adapter = AcpAdapter(
+        task,
+        manager,  # type: ignore[arg-type]
+        command=command,
+        environment=_environment_for(manifest),
+    )
+    await asyncio.wait_for(adapter.start(), timeout=20)
+    await asyncio.wait_for(adapter.wait(), timeout=30)
+    persisted = task_repo.get_task(task.id)
+    if persisted is None or persisted.status is not TaskStatus.FAILED:
+        status = persisted.status.value if persisted else "missing"
+        raise RuntimeError(
+            f"Failure contract did not persist a failed terminal state (got {status})"
+        )
+    event_types = [event.type.value for event in manager.agent_events]
+    if AgentEventType.RUN_FAILED.value not in event_types:
+        raise RuntimeError("Failure contract did not emit a normalized run.failed event")
+    return event_types
+
+
 def _required_event_types(manifest: AdapterManifest) -> set[str]:
     required = set(DEFAULT_EXPECTED_EVENTS)
     for capability, event_types in CAPABILITY_EVENTS.items():
@@ -145,7 +173,7 @@ def _required_event_types(manifest: AdapterManifest) -> set[str]:
 
 
 async def run_contract(manifest_path: Path) -> dict[str, Any]:
-    """Run new-session, optional resume, and cancellation evidence in isolation."""
+    """Run new-session, optional resume, cancellation, and failure evidence in isolation."""
     manifest_path = manifest_path.expanduser().resolve()
     manifest = load_manifest(manifest_path)
     command = resolve_command(manifest, manifest_path)
@@ -204,6 +232,25 @@ async def run_contract(manifest_path: Path) -> dict[str, Any]:
                 )
                 cancellation_checked = True
 
+            failure_checked = False
+            failure_events: list[str] = []
+            recovery_checked = False
+            if fixture and fixture.failure_arguments:
+                failure_events = await _failed_run(
+                    manifest,
+                    workspace,
+                    [*command, *fixture.failure_arguments],
+                )
+                failure_checked = True
+                # Prove a terminal failed run does not poison the shared DB/registry path.
+                await _completed_run(
+                    manifest,
+                    manifest_path,
+                    workspace,
+                    command,
+                )
+                recovery_checked = True
+
             return {
                 "schema_version": 1,
                 "contract_suite": CONTRACT_SUITE_ID,
@@ -220,6 +267,9 @@ async def run_contract(manifest_path: Path) -> dict[str, Any]:
                 "resume_checked": resume_checked,
                 "cancellation_checked": cancellation_checked,
                 "cancellation_event_types": cancellation_events,
+                "failure_checked": failure_checked,
+                "failure_event_types": failure_events,
+                "failure_recovery_checked": recovery_checked,
                 "security": {
                     "shell_used": False,
                     "temporary_workspace": True,

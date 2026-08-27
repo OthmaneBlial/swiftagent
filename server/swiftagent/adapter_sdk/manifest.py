@@ -86,6 +86,7 @@ class ContractFixture(ManifestModel):
     )
     expected_event_types: list[str] = Field(default_factory=list, max_length=32)
     cancellation_arguments: list[str] = Field(default_factory=list, max_length=16)
+    failure_arguments: list[str] = Field(default_factory=list, max_length=16)
 
     @field_validator("fixture_files")
     @classmethod
@@ -103,6 +104,13 @@ class ContractFixture(ManifestModel):
     def validate_cancellation_arguments(cls, arguments: list[str]) -> list[str]:
         if any(not argument or len(argument) > MAX_ARGUMENT_CHARS for argument in arguments):
             raise ValueError("Cancellation arguments must be non-empty bounded strings")
+        return arguments
+
+    @field_validator("failure_arguments")
+    @classmethod
+    def validate_failure_arguments(cls, arguments: list[str]) -> list[str]:
+        if any(not argument or len(argument) > MAX_ARGUMENT_CHARS for argument in arguments):
+            raise ValueError("Failure arguments must be non-empty bounded strings")
         return arguments
 
     @field_validator("expected_event_types")

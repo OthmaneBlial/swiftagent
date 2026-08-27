@@ -24,8 +24,12 @@ PYTHONPATH=server server/.venv/bin/python \
 ```
 
 The example exercises a new session, a resumed session, workspace file
-callbacks, one approval, tool events, a plan, usage, a terminal result, and
-cancellation. Everything runs in a temporary workspace with no network call.
+callbacks, one approval, tool events, a plan, usage, a terminal result,
+cancellation, and a deterministic failed run that still leaves the harness able
+to complete a following normal run. Everything runs in a temporary workspace
+with no network call. The contract report records `failure_checked: true` and
+`failure_event_types` (including `run.failed`) when a fail fixture is supplied;
+expected failure is evidence, not a failed contract.
 
 ## Add a local adapter
 

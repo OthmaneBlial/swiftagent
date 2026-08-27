@@ -51,7 +51,7 @@ The authoritative schema is
 | `capabilities` | Conservative maximum exposed to the UI and saved with the run. |
 | `version_probe` | Optional free, bounded local command/regex; no model prompt. |
 | `compatibility` | Exact versions, OS scope, contract result, date, and evidence references. |
-| `contract` | Deterministic fixture input, expected events, and optional cancel scenario. |
+| `contract` | Deterministic fixture input, expected events, and optional cancel/fail argv scenarios. |
 
 ## Capability mapping and UI behavior
 
@@ -123,7 +123,13 @@ approval, and no network requirement. It validates:
 - normalized evidence for every declared event capability;
 - native-session persistence and resume when declared;
 - cancellation and terminal cancelled state when a cancel fixture is supplied;
+- failure isolation when `failure_arguments` are supplied: a terminal failed
+  task, a normalized `run.failed` event, `failure_checked: true` on the report,
+  and a following normal run that still completes (`failure_recovery_checked`);
 - literal command launch, bounded environment forwarding, and no shell.
+
+Expected failure evidence does not make the contract report fail. The report's
+`failure_event_types` list is the exact normalized trail for the fail scenario.
 
 A passing JSON report is test evidence, not endorsement. Submit it with the
 compatibility template and security checklist. Built-in or community trust is

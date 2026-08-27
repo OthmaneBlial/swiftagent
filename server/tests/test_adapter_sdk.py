@@ -51,13 +51,16 @@ def test_manifest_rejects_shells_unknown_fields_and_self_verified_isolation() ->
 
 
 @pytest.mark.asyncio
-async def test_public_example_passes_new_resume_capabilities_and_cancellation_contract() -> None:
+async def test_public_example_passes_new_resume_capabilities_cancellation_and_failure_contract() -> None:
     report = await run_contract(MANIFEST)
 
     assert report["result"] == "passed"
     assert report["contract_suite"] == CONTRACT_SUITE_ID
     assert report["resume_checked"] is True
     assert report["cancellation_checked"] is True
+    assert report["failure_checked"] is True
+    assert report["failure_recovery_checked"] is True
+    assert "run.failed" in report["failure_event_types"]
     assert report["security"] == {
         "shell_used": False,
         "temporary_workspace": True,
@@ -65,6 +68,24 @@ async def test_public_example_passes_new_resume_capabilities_and_cancellation_co
         "environment_allowlist": [],
     }
     assert set(report["required_event_types"]).issubset(report["event_types"])
+
+
+def test_contract_fixture_accepts_bounded_failure_arguments_matching_schema() -> None:
+    payload = json.loads(MANIFEST.read_text(encoding="utf-8"))
+    schema = json.loads(SCHEMA.read_text(encoding="utf-8"))
+    contract_schema = schema["$defs"]["contract"]["properties"]
+
+    assert "failure_arguments" in contract_schema
+    assert contract_schema["failure_arguments"]["maxItems"] == 16
+    assert payload["contract"]["failure_arguments"] == ["--scenario", "fail"]
+
+    manifest = AdapterManifest.model_validate(payload)
+    assert manifest.contract is not None
+    assert manifest.contract.failure_arguments == ["--scenario", "fail"]
+
+    payload["contract"]["failure_arguments"] = [""]
+    with pytest.raises(ValidationError, match="Failure arguments must be non-empty"):
+        AdapterManifest.model_validate(payload)
 
 
 def test_local_manifest_registers_without_core_edits_and_forwards_only_allowlisted_env(

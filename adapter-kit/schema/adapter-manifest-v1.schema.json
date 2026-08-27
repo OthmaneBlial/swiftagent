@@ -149,6 +149,11 @@
           "type": "array",
           "maxItems": 16,
           "items": { "type": "string", "minLength": 1, "maxLength": 4096 }
+        },
+        "failure_arguments": {
+          "type": "array",
+          "maxItems": 16,
+          "items": { "type": "string", "minLength": 1, "maxLength": 4096 }
         }
       }
     }

@@ -4,6 +4,7 @@ All notable changes are documented here. This project follows semantic versionin
 
 ## Unreleased
 
+- Extend the public Adapter contract fixture with optional `failure_arguments`, a deterministic example fail scenario, and harness evidence (`failure_checked`, `run.failed`, recovery run) so expected failure is isolated without failing the contract.
 - Reap the OpenCode JSON fallback child and stderr stream after malformed output so asyncio transports close before the test or application loop exits.
 - Use Starlette's supported `httpx2` test client and Node 24-based official GitHub Actions to keep verification warning-free.
 

@@ -13,9 +13,10 @@ make setup
 make adapter-kit-test
 ```
 
-The example must finish with `"result": "passed"`, `resume_checked: true`, and
-`cancellation_checked: true`. If it does not, fix the checkout before changing
-the fixture.
+The example must finish with `"result": "passed"`, `resume_checked: true`,
+`cancellation_checked: true`, and `failure_checked: true` (plus
+`failure_recovery_checked: true` when a fail fixture is present). If it does
+not, fix the checkout before changing the fixture.
 
 ## 2. Copy and reduce the example
 
@@ -54,8 +55,9 @@ PYTHONPATH=server server/.venv/bin/python \
 ```
 
 Test at least a new session, every declared event capability, resume when
-declared, cancellation, malformed output, process exit, timeout, and output
-limits. Unsupported behavior must remain explicit rather than simulated.
+declared, cancellation, deterministic failure (`run.failed` plus a following
+successful run), malformed output, process exit, timeout, and output limits.
+Unsupported behavior must remain explicit rather than simulated.
 
 ## 5. Review locally
 

@@ -56,7 +56,8 @@
       "message.completed",
       "run.completed"
     ],
-    "cancellation_arguments": ["--scenario", "cancel"]
+    "cancellation_arguments": ["--scenario", "cancel"],
+    "failure_arguments": ["--scenario", "fail"]
   },
   "documentation_url": "https://github.com/OthmaneBlial/swiftagent/tree/main/adapter-kit/example-adapter"
 }
